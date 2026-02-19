@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SPETAGA - SMP TAKHASSUS AL-QUR'AN 3</title>
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+
+    <div id="login-layer">
+        <div class="login-box">
+            <img src="logo.png" alt="Logo" class="login-logo">
+            <h2>LOGIN SPETAGA</h2>
+            <div class="input-group">
+                <input type="text" id="user-in" placeholder="Username" onfocus="hideLoginError()">
+                <input type="password" id="pass-in" placeholder="Password" onfocus="hideLoginError()">
+            </div>
+            <div id="login-error" style="color: #e74c3c; font-weight: bold; margin-bottom: 15px; font-size: 0.9rem; display: none;"></div>
+            
+            <button class="btn-login" onclick="doLogin()">MASUK</button>
+        </div>
+    </div>
+
+    <div id="app-shell" style="display:none;">
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <img src="logo.png" alt="Logo" class="mini-logo">
+                <span>SPETAGA</span>
+            </div>
+            <nav id="main-nav">
+                <div class="nav-link" id="n-dash" onclick="openPage('dash')">📊 <span>Dashboard</span></div>
+                <div class="nav-link guru-only" id="n-absen" onclick="openPage('absen')">📝 <span>Sesi Absen</span></div>
+                <div class="nav-link admin-only" id="n-siswa" onclick="openPage('siswa')">👥 <span>Master Siswa</span></div>
+                <div class="nav-link admin-only" id="n-user" onclick="openPage('user')">⚙️ <span>Kelola User</span></div>
+                <div class="nav-link admin-only" onclick="showCetakModal()">🖨️ <span>Cetak PDF</span></div>
+                <div class="nav-link btn-logout" onclick="location.reload()">🚪 <span>Keluar</span></div>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <div id="pg-dash" class="page">
+                <h1>Dashboard Absensi</h1>
+                <div class="card">
+                    <div class="desktop-grid">
+                        <input type="date" id="dash-f-tgl-mulai" onchange="viewRekap()">
+                        <input type="date" id="dash-f-tgl-akhir" onchange="viewRekap()">
+                    </div>
+                    <div class="desktop-grid" style="margin-top:10px">
+                        <select id="dash-f-kelas" onchange="updateNamaFilter(); viewRekap();">
+                            <option value="">Semua Kelas</option>
+                            <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+                        </select>
+                        <select id="dash-f-nama" onchange="viewRekap()"><option value="">Semua Nama</option></select>
+                    </div>
+                </div>
+                <div class="stat-container">
+                    <div class="stat-card bg-h">H: <span id="stat-h">0</span></div>
+                    <div class="stat-card bg-i">I: <span id="stat-i">0</span></div>
+                    <div class="stat-card bg-s">S: <span id="stat-s">0</span></div>
+                    <div class="stat-card bg-a">A: <span id="stat-a">0</span></div>
+                </div>
+                <div id="rekap-view" class="card no-padding"></div>
+            </div>
+
+            <div id="pg-absen" class="page">
+                <h1>Input Absensi</h1>
+                <div class="card">
+                    <div class="desktop-flex" style="gap:15px">
+                        <select id="sel-kls" onchange="loadSiswaAbsen()" style="flex:1"><option value="">Pilih Kelas</option><option value="7">7</option><option value="8">8</option><option value="9">9</option></select>
+                        <select id="mapel-select" onchange="loadSiswaAbsen()" style="flex:1"></select>
+                    </div>
+                    <div id="list-abs" style="margin-top:20px"></div>
+                    <button class="btn-save" id="btn-save" style="display:none; margin-top:20px" onclick="saveAbsen()">SIMPAN ABSENSI</button>
+                </div>
+            </div>
+
+            <div id="pg-siswa" class="page">
+                <h1>Master Siswa</h1>
+                <div class="card desktop-flex" style="gap:10px">
+                    <input type="text" id="in-nama-s" placeholder="Nama Siswa" style="flex:2">
+                    <select id="in-kls-s" style="flex:1"><option value="7">7</option><option value="8">8</option><option value="9">9</option></select>
+                    <button class="btn-save" style="flex:1" onclick="addSiswa()">TAMBAH</button>
+                </div>
+                <div class="card no-padding">
+                    <div style="padding:15px; text-align:right; border-bottom:1px solid #eee">
+                        Filter Kelas: <select id="f-kls-siswa" onchange="viewSiswa()" style="width:auto"><option value="">Semua</option><option value="7">7</option><option value="8">8</option><option value="9">9</option></select>
+                    </div>
+                    <div class="table-wrapper"><table><thead><tr><th>Nama</th><th>Kelas</th><th>Aksi</th></tr></thead><tbody id="tb-siswa"></tbody></table></div>
+                </div>
+            </div>
+
+            <div id="pg-user" class="page">
+                <h1>Kelola User</h1>
+                <div class="card"><button class="btn-save" style="width:auto; padding:10px 20px" onclick="showUserModal()">+ TAMBAH USER</button></div>
+                <div class="card no-padding"><div class="table-wrapper"><table><thead><tr><th>Username</th><th>Mapel</th><th>Role</th><th>Aksi</th></tr></thead><tbody id="tb-user"></tbody></table></div></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
