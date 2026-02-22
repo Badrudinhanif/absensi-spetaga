@@ -12,7 +12,14 @@
 </head>
 <body>
 
-<div id="login-layer">
+<div id="global-loader">
+    <div class="loader-content">
+        <div class="spinner"></div>
+        <p style="font-weight: bold; letter-spacing: 1px;">MEMUAT APLIKASI...</p>
+    </div>
+</div>
+
+<div id="login-layer" style="display:none">
     <div class="login-box">
         <img src="logo.png" alt="Logo" class="login-logo" onerror="this.style.display='none'">
         <h2>LOGIN SPETAGA</h2>
@@ -38,11 +45,11 @@
             <div class="nav-link admin-only" id="n-siswa" onclick="openPage('siswa')">👥<span>Siswa</span></div>
             <div class="nav-link admin-only" id="n-user" onclick="openPage('user')">🔐<span>User</span></div>
             <div class="nav-link admin-only" onclick="showCetakModal()">🖨️<span>Ekspor Data</span></div>
-            <div class="nav-link btn-logout" style="color:#ef4444; opacity:1; margin-top:20px; border-top:1px solid rgba(255,255,255,0.1); padding-top:15px;">🚪<span>Keluar</span></div>
+            <div class="nav-link btn-logout" style="color:#ef4444; opacity:1">🚪<span>Keluar</span></div>
         </nav>
     </div>
 
-    <div class="fab-help" onclick="hubungiAdmin()" title="Butuh Bantuan?">
+    <div class="fab-help" onclick="hubungiAdmin()" title="Butuh Bantuan?" style="display:none;">
         <span>🆘</span>
     </div>
 
@@ -78,28 +85,40 @@
         </div>
 
         <div id="pg-nilai" class="page guru-only">
-            <h2 style="margin-top:0">Input Nilai</h2>
+            <h2 style="margin-top:0">Input Nilai Akademik</h2>
             <div class="card">
                 <div class="desktop-grid">
                     <select id="n-sel-kls"><option value="">Pilih Kelas</option><option value="7">Kelas 7</option><option value="8">Kelas 8</option><option value="9">Kelas 9</option></select>
-                    <select id="n-sel-jenis"><option value="Harian">Tugas Harian / Praktik</option><option value="UTS">UTS</option><option value="UAS">UAS</option></select>
+                    <select id="n-sel-jenis"><option value="Harian">Tugas Harian / Praktik</option><option value="UTS">Ujian Tengah Semester (UTS)</option><option value="UAS">Ujian Akhir Semester (UAS)</option></select>
                     <input type="text" id="n-ket" placeholder="Keterangan (Contoh: Modul Word)">
                     <input type="date" id="n-tgl">
                 </div>
                 <button onclick="loadSiswaNilai()" class="btn-save" style="margin-top:20px; width:100%; background:#f59e0b; color:#fff">Buat Baris Penilaian</button>
             </div>
+            
             <div class="card no-padding" id="container-nilai" style="display:none; margin-top:20px">
                 <div id="list-nilai"></div>
-                <div style="padding:20px"><button onclick="saveNilai()" id="btn-save-nilai" class="btn-save" style="width:100%">SIMPAN SEMUA NILAI</button></div>
-            </div>
-            <div class="card" style="margin-top: 40px; border-top: 4px solid var(--p);">
-                <h3>Riwayat Nilai</h3>
-                <div class="desktop-flex" style="gap:10px;">
-                    <select id="r-sel-kls" style="flex:1" onchange="updateDropdownTugas()"><option value="">Semua Kelas</option><option value="7">7</option><option value="8">8</option><option value="9">9</option></select>
-                    <select id="r-ket" style="flex:2"><option value="">Semua Tugas</option></select>
-                    <button onclick="loadRiwayatNilai()" class="btn-save" style="background:var(--side); color:white;">CARI</button>
+                <div style="padding:20px">
+                    <button onclick="saveNilai()" id="btn-save-nilai" class="btn-save" style="width:100%">SIMPAN SEMUA NILAI</button>
                 </div>
-                <div class="card no-padding" style="margin-top:20px; border:none;"><table style="width:100%"><thead><tr><th>Tugas</th><th>Siswa</th><th>Nilai</th><th>Aksi</th></tr></thead><tbody id="tb-riwayat-nilai"></tbody></table></div>
+            </div>
+
+            <div class="card" style="margin-top: 40px; border-top: 4px solid var(--p);">
+                <h3 style="margin-top:0; color:var(--text)">Riwayat Nilai Tersimpan</h3>
+                <div class="desktop-flex" style="gap:10px;">
+                    <select id="r-sel-kls" style="flex:1" onchange="updateDropdownTugas()"><option value="">Semua Kelas</option><option value="7">Kelas 7</option><option value="8">Kelas 8</option><option value="9">Kelas 9</option></select>
+                    <select id="r-sel-jenis" style="flex:1" onchange="updateDropdownTugas()"><option value="">Semua Jenis</option><option value="Harian">Harian / Praktik</option><option value="UTS">UTS</option><option value="UAS">UAS</option></select>
+                    <select id="r-ket" style="flex:1.5"><option value="">Semua Tugas</option></select>
+                    <button onclick="loadRiwayatNilai()" class="btn-save" style="background:var(--side); color:white; padding:16px 20px;">CARI</button>
+                </div>
+                <div class="card no-padding" style="margin-top:20px; border:none; box-shadow:none;">
+                    <table>
+                        <thead><tr><th>Tugas / Ujian</th><th>Siswa & Kelas</th><th>Nilai</th><th>Aksi</th></tr></thead>
+                        <tbody id="tb-riwayat-nilai">
+                            <tr><td colspan="4" style="text-align:center; padding: 30px; color: #64748b;">Silakan atur filter di atas lalu klik <b>CARI</b> untuk menampilkan riwayat.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -107,19 +126,23 @@
             <h2 style="margin-top:0">Master Data Siswa</h2>
             <div class="card desktop-flex">
                 <input type="text" id="in-nama-s" placeholder="Nama Siswa Baru" style="flex:2">
-                <select id="in-kls-s" style="flex:1"><option value="7">7</option><option value="8">8</option><option value="9">9</option></select>
+                <select id="in-kls-s" style="flex:1"><option value="7">Kelas 7</option><option value="8">Kelas 8</option><option value="9">Kelas 9</option></select>
                 <button onclick="addSiswa()" class="btn-save">TAMBAH</button>
             </div>
             <div class="card no-padding">
-                <div style="padding:15px;"><select id="f-kls-siswa" onchange="viewSiswa()"><option value="">Semua Kelas</option><option value="7">7</option><option value="8">8</option><option value="9">9</option></select></div>
+                <div style="padding:15px; border-bottom:1px solid #eee">
+                    <select id="f-kls-siswa" onchange="viewSiswa()"><option value="">Semua Kelas</option><option value="7">Kelas 7</option><option value="8">Kelas 8</option><option value="9">Kelas 9</option></select>
+                </div>
                 <table><thead><tr><th>Nama</th><th>Kelas</th><th>Aksi</th></tr></thead><tbody id="tb-siswa"></tbody></table>
             </div>
         </div>
 
         <div id="pg-user" class="page admin-only">
-            <h2 style="margin-top:0">Kelola Pengguna</h2>
+            <h2 style="margin-top:0">Kelola Pengguna (Guru/Admin)</h2>
             <button onclick="showUserModal()" class="btn-save" style="margin-bottom:20px">+ TAMBAH USER</button>
-            <div class="card no-padding"><table><thead><tr><th>Username</th><th>Nama Lengkap</th><th>Role</th><th>Aksi</th></tr></thead><tbody id="tb-user"></tbody></table></div>
+            <div class="card no-padding">
+                <table><thead><tr><th>Username</th><th>Nama Lengkap</th><th>Mapel</th><th>Role</th><th>Aksi</th></tr></thead><tbody id="tb-user"></tbody></table>
+            </div>
         </div>
     </div>
 </div>

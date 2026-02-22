@@ -9,11 +9,7 @@
     --glass-blur: 15px;
 }
 
-/* KUNCI PRESISI MUTLAK */
-* {
-    box-sizing: border-box;
-    -webkit-font-smoothing: antialiased;
-}
+* { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
 
 body { 
     font-family: 'Inter', 'Segoe UI', sans-serif; 
@@ -22,99 +18,73 @@ body {
     color: var(--text); 
 }
 
-/* ANTI BOCOR NAVIGASI */
 .page { display: none !important; }
 .page.active { display: block !important; animation: fadeIn 0.4s ease; }
+
+/* ==========================================================
+   TIRAI LOADING (PRELOADER)
+   ========================================================== */
+#global-loader {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(135deg, var(--side), var(--p));
+    display: flex; align-items: center; justify-content: center;
+    z-index: 99999; color: white; transition: opacity 0.5s ease;
+}
+.loader-content { text-align: center; }
+.spinner {
+    width: 45px; height: 45px;
+    border: 5px solid rgba(255,255,255,0.2); border-top: 5px solid #10b981;
+    border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 15px auto;
+}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
 /* ==========================================================
    GLOBAL INPUT & SELECT
    ========================================================== */
 input:not([type="radio"]), select { 
-    width: 100%; 
-    padding: 16px 20px; 
-    border: 2px solid #e2e8f0; 
-    border-radius: 14px; 
-    background-color: #f1f5f9; 
-    font-size: 1rem; 
-    color: #1e293b; 
-    outline: none; 
-    transition: all 0.3s ease; 
-    font-family: inherit;
+    width: 100%; padding: 16px 20px; border: 2px solid #e2e8f0; 
+    border-radius: 14px; background-color: #f1f5f9; font-size: 1rem; 
+    color: #1e293b; outline: none; transition: all 0.3s ease; font-family: inherit;
 }
-
 input:not([type="radio"]):focus, select:focus { 
-    background: white; 
-    border-color: var(--p); 
-    box-shadow: 0 0 0 4px rgba(0, 123, 94, 0.1); 
+    background: white; border-color: var(--p); box-shadow: 0 0 0 4px rgba(0, 123, 94, 0.1); 
 }
-
 select { 
     appearance: none;
     background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-    background-repeat: no-repeat; 
-    background-position: right 15px center; 
-    background-size: 18px; 
+    background-repeat: no-repeat; background-position: right 15px center; background-size: 18px; 
 }
 
 /* ==========================================================
-   LOGIN PAGE (GLASSMORPHISM & KUNCI IKON ABSOLUT)
+   LOGIN PAGE (GLASSMORPHISM)
    ========================================================== */
 #login-layer { 
-    position: fixed; 
-    inset: 0; 
-    background: #ffffff;
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    z-index: 2000; 
-    padding: 20px;
+    position: fixed; inset: 0; background: #ffffff;
+    display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px;
 }
-
 .login-box { 
-    background: var(--glass-bg);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    border: 1px solid var(--glass-border);
-    padding: 50px 40px; 
-    border-radius: 24px; 
-    width: 100%;
-    max-width: 380px; 
-    text-align: center;
+    background: var(--glass-bg); backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur)); border: 1px solid var(--glass-border);
+    padding: 50px 40px; border-radius: 24px; width: 100%; max-width: 380px; text-align: center;
     box-shadow: 0 20px 40px rgba(0, 123, 94, 0.1), 0 0 0 1px rgba(255,255,255,0.1) inset;
-    animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
-
 .login-logo { width: 90px; margin-bottom: 25px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); }
 .login-box h2 { color: #004d3b; font-size: 1.6rem; font-weight: 800; margin: 0 0 35px 0; letter-spacing: -0.5px; }
 .input-group { display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; width: 100%; }
-
 .input-group input {
-    border-color: var(--glass-border);
-    background-color: rgba(255, 255, 255, 0.8);
-    padding-left: 55px; 
-    background-repeat: no-repeat !important;
-    background-position: 18px center !important;
-    background-size: 20px !important;
-    transition: border-color 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease;
-    color: #004d3b;
+    border-color: var(--glass-border); background-color: rgba(255, 255, 255, 0.8);
+    padding-left: 55px; background-repeat: no-repeat !important; background-position: 18px center !important;
+    background-size: 20px !important; color: #004d3b;
 }
-
 #user-in { background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23007b5e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'%3e%3c/path%3e%3ccircle cx='12' cy='7' r='4'%3e%3c/circle%3e%3c/svg%3e"); }
 #pass-in { background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23007b5e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3crect x='3' y='11' width='18' height='11' rx='2' ry='2'%3e%3c/rect%3e%3cpath d='M7 11V7a5 5 0 0 1 10 0v4'%3e%3c/path%3e%3c/svg%3e"); }
-
 .input-group input:focus { border-color: var(--p); background-color: #fff; box-shadow: 0 0 0 4px rgba(0, 123, 94, 0.2); }
-
 .btn-login { 
     width: 100%; padding: 16px; background: var(--p); color: white; border: none; border-radius: 14px; 
-    font-weight: 700; cursor: pointer; transition: all 0.3s ease; font-size: 1.1rem; letter-spacing: 0.5px; 
-    text-transform: uppercase; box-shadow: 0 4px 6px rgba(0, 123, 94, 0.3);
+    font-weight: 700; cursor: pointer; transition: all 0.3s ease; font-size: 1.1rem; text-transform: uppercase; 
 }
-.btn-login:hover { background: #005d47; transform: translateY(-3px) scale(1.01); box-shadow: 0 10px 20px rgba(0, 123, 94, 0.4); }
-.btn-login:active { transform: translateY(-1px); box-shadow: 0 5px 10px rgba(0, 123, 94, 0.3); }
-
+.btn-login:hover { background: #005d47; transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0, 123, 94, 0.4); }
 #login-error { margin-top: -10px; margin-bottom: 16px; font-size: 0.9rem; color: #d32f2f; background: rgba(253, 232, 232, 0.9); padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #f8b4b4; }
-
-@keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
 
 /* ==========================================================
    SIDEBAR & DASHBOARD ELEMENTS 
@@ -123,25 +93,15 @@ select {
 .sidebar-brand { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 30px; border-bottom: 1px solid rgba(255,255,255,0.05); }
 .mini-logo { width: 35px; height: 35px; }
 .sidebar-brand span { font-weight: 800; color: var(--p); font-size: 1.2rem; }
-
-/* Navigasi Desktop: Vertikal */
-nav {
-    display: flex;
-    flex-direction: column;
-    margin-top: 20px;
-    gap: 8px;
-}
-
+nav { display: flex; flex-direction: column; margin-top: 20px; gap: 8px; }
 .nav-link { padding: 16px 28px; cursor: pointer; display: flex; align-items: center; gap: 14px; opacity: 0.6; transition: 0.3s; font-size: 1.3rem; }
 .nav-link span { font-size: 0.95rem; font-weight: 600; }
 .nav-link:hover { opacity: 1; background: rgba(255,255,255,0.05); }
 .nav-link.active { opacity: 1; background: rgba(0,123,94,0.15); color: #10b981; border-right: 4px solid var(--p); }
 
 .main-content { margin-left: 260px; padding: 40px; box-sizing: border-box; }
-
 .card { background: white; padding: 25px; border-radius: 20px; border: 1px solid #e2e8f0; margin-bottom: 25px; }
 .card.no-padding { padding: 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-
 .desktop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
 .desktop-flex { display: flex; align-items: center; gap: 15px; }
 
@@ -163,119 +123,47 @@ th, td { padding: 18px; text-align: left; border-bottom: 1px solid #f1f5f9; }
 th { background: #f8fafc; color: #64748b; font-size: 0.8rem; text-transform: uppercase; font-weight: 700; }
 
 /* ==========================================================
-   SWEETALERT2 MODAL REPAIR (MEMPERBAIKI POP-UP)
+   SWEETALERT2 MODAL REPAIR
    ========================================================== */
 .swal2-popup { border-radius: 24px !important; padding: 1.5em !important; }
 .swal2-html-container { overflow-x: hidden !important; padding: 10px 0 !important; margin: 1em 0 !important; }
-.swal2-html-container .swal2-input, .swal2-html-container .swal2-select { width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; margin: 12px 0 !important; border: 2px solid #e2e8f0 !important; border-radius: 14px !important; padding: 14px 20px !important; font-size: 1rem !important; background-color: #f1f5f9 !important; color: #1e293b !important; transition: all 0.3s ease !important; display: block !important; height: 52px !important; }
-.swal2-html-container .swal2-input:focus, .swal2-html-container .swal2-select:focus { background-color: #ffffff !important; border-color: var(--p) !important; box-shadow: 0 0 0 4px rgba(0, 123, 94, 0.1) !important; outline: none !important; }
-.swal2-html-container .swal2-select { appearance: none !important; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") !important; background-repeat: no-repeat !important; background-position: right 15px center !important; background-size: 18px !important; }
+.swal2-html-container .swal2-input, .swal2-html-container .swal2-select { width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; margin: 12px 0 !important; border: 2px solid #e2e8f0 !important; border-radius: 14px !important; padding: 14px 20px !important; font-size: 1rem !important; background-color: #f1f5f9 !important; color: #1e293b !important; display: block !important; height: 52px !important; }
 
 /* ==========================================================
    FLOATING ACTION BUTTON (BANTUAN)
    ========================================================== */
 .fab-help {
-    position: fixed;
-    bottom: 25px;
-    right: 25px;
-    width: 60px;
-    height: 60px;
-    background-color: #25d366;
-    color: white;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    cursor: pointer;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    z-index: 9999;
-    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: fixed; bottom: 25px; right: 25px; width: 60px; height: 60px;
+    background-color: #25d366; color: white; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; font-size: 24px; cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 9999; transition: all 0.3s ease;
 }
-.fab-help:hover {
-    transform: scale(1.1) rotate(10deg);
-    background-color: #128c7e;
-}
+.fab-help:hover { transform: scale(1.1) rotate(10deg); background-color: #128c7e; }
 
 /* ==========================================================
-   TAMPILAN MOBILE (RESPONSIF) - TERPUSAT DAN BERSIH
+   TAMPILAN MOBILE (RESPONSIF)
    ========================================================== */
 @media (max-width: 768px) {
     .sidebar { 
-        width: 100%; 
-        height: auto; 
-        bottom: 0; 
-        top: auto; 
-        border-top: 1px solid rgba(255,255,255,0.05); 
-        z-index: 10000; /* Pastikan selalu di atas konten */
-        background: rgba(15, 23, 42, 0.98); 
-        backdrop-filter: blur(10px); 
+        width: 100%; height: auto; bottom: 0; top: auto; 
+        border-top: 1px solid rgba(255,255,255,0.05); z-index: 10000; 
+        background: rgba(15, 23, 42, 0.98); backdrop-filter: blur(10px); 
         padding-bottom: env(safe-area-inset-bottom); 
     }
     .sidebar-brand { display: none; }
+    nav { display: flex; flex-direction: row; justify-content: space-around; align-items: center; padding: 8px 5px; margin-top: 0; gap: 0; }
+    .nav-link { flex-direction: column; padding: 6px 2px; font-size: 1.2rem; flex: 1; text-align: center; gap: 4px; border: none !important; border-radius: 12px; margin: 0 2px !important; }
+    .nav-link span { font-size: 0.6rem; display: block; line-height: 1; }
+    .nav-link.active { background: rgba(16, 185, 129, 0.15); color: #10b981; box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.2); }
+    .btn-logout { margin-top: 0 !important; padding-top: 6px !important; border-top: none !important; }
     
-    nav { 
-        display: flex; 
-        flex-direction: row; 
-        justify-content: space-around; 
-        align-items: center; /* Memastikan semua sejajar di tengah */
-        padding: 8px 5px;
-        margin-top: 0; 
-        gap: 0; 
-    }
-    
-    .nav-link { 
-        flex-direction: column; 
-        padding: 6px 2px; 
-        font-size: 1.2rem; 
-        flex: 1; 
-        text-align: center; 
-        gap: 4px; 
-        border: none !important; /* Menghapus garis keras kepala */
-        border-radius: 12px; 
-        margin: 0 2px !important; 
-    }
-    
-    .nav-link span { 
-        font-size: 0.6rem; 
-        display: block; 
-        line-height: 1;
-    }
-    
-    .nav-link.active { 
-        background: rgba(16, 185, 129, 0.15); 
-        color: #10b981; 
-        box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.2); 
-    }
-
-    /* KUNCI PAKSA TOMBOL KELUAR AGAR SEJAJAR */
-    .btn-logout {
-        margin-top: 0 !important;
-        padding-top: 6px !important;
-        border-top: none !important;
-    }
-    
-    /* NAFAS BAWAH AGAR KONTEN TIDAK TERTUTUP SOS & NAV */
-    .main-content { 
-        margin-left: 0; 
-        margin-bottom: 0; 
-        padding: 20px;
-        padding-bottom: 120px; /* Jarak ekstra panjang */
-    }
-    
+    .main-content { margin-left: 0; margin-bottom: 0; padding: 20px; padding-bottom: 120px; }
     .absen-row { flex-direction: column; align-items: flex-start; gap: 15px; }
     .radio-group { width: 100%; justify-content: space-between; }
     .desktop-grid { grid-template-columns: 1fr; }
     .desktop-flex { flex-direction: column; }
     .stat-container { grid-template-columns: repeat(2, 1fr); }
     th, td { padding: 14px 16px; white-space: nowrap; font-size: 0.85rem; }
-
-    /* MENGANGKAT TOMBOL SOS DI ATAS NAVIGASI BAWAH */
-    .fab-help { 
-        bottom: 95px; 
-        right: 20px; 
-        width: 50px; 
-        height: 50px; 
-        font-size: 20px; 
-    }
+    .fab-help { bottom: 95px; right: 20px; width: 50px; height: 50px; font-size: 20px; }
 }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
