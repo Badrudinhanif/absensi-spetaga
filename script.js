@@ -6,6 +6,8 @@ const KEY_DB = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const sp = supabase.createClient(URL_DB, KEY_DB);
 
 let activeUser = null;
+let idleTimer;
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 Menit dalam milidetik
 
 const ui = {
     btnLoading: (status, originalText) => { const btn = document.querySelector('.btn-login'); if (btn) { btn.disabled = status; btn.innerText = status ? "Memverifikasi..." : originalText; }},
@@ -28,60 +30,73 @@ async function getBase64Image(url) {
     });
 }
 
+// SENSOR TOMBOL ENTER UNTUK LOGIN
 document.addEventListener('keydown', function(event) {
-    if (event.key === 'Enter') { const loginLayer = document.getElementById('login-layer'); if (loginLayer && loginLayer.style.display !== 'none') doLogin(); }
+    if (event.key === 'Enter') { 
+        const loginLayer = document.getElementById('login-layer'); 
+        if (loginLayer && loginLayer.style.display !== 'none') {
+            doLogin(); 
+        }
+    }
 });
 
 // ==========================================
-// 2. AUTHENTICATION & PERSISTENSI SESI
+// 2. KEAMANAN & SESI
 // ==========================================
+function resetIdleTimer() {
+    clearTimeout(idleTimer);
+    if (activeUser) {
+        idleTimer = setTimeout(() => {
+            sp.auth.signOut().then(() => {
+                activeUser = null;
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Sesi Habis',
+                    text: 'Demi keamanan data, Anda telah dikeluarkan secara otomatis karena tidak ada aktivitas selama 30 menit.',
+                    confirmButtonColor: '#007b5e',
+                    allowOutsideClick: false
+                }).then(() => location.reload());
+            });
+        }, IDLE_TIMEOUT_MS);
+    }
+}
 
-// Fungsi baru: Memeriksa ingatan browser saat halaman di-refresh
+['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'].forEach(evt => document.addEventListener(evt, resetIdleTimer));
+
 async function cekSesiAktif() {
-    const { data: { session }, error } = await sp.auth.getSession();
-    
+    const { data: { session } } = await sp.auth.getSession();
     if (session && session.user) {
-        // Jika ada tiket masuk (session), tarik ulang profil dari database
-        const secretEmail = session.user.email;
-        const u = secretEmail.replace('@spetaga.com', ''); // Ekstrak username dari email
-        
+        const u = session.user.email.replace('@spetaga.com', '');
         const { data: userData } = await sp.from('users').select('*').eq('username', u).maybeSingle();
-        
         if (userData) {
-            // Bangkitkan kembali variabel memori
             activeUser = userData;
             document.getElementById('login-layer').style.display = 'none';
             document.getElementById('app-shell').style.display = 'block';
             
-            // Atur ulang hak akses menu
             const r = userData.role.toLowerCase();
+            
+            // LOGIKA HAK AKSES (ROLE-BASED ACCESS CONTROL)
             document.querySelectorAll('.admin-only').forEach(e => e.style.display = r === 'admin' ? 'flex' : 'none');
             document.querySelectorAll('.guru-only').forEach(e => e.style.display = r === 'guru' ? 'flex' : 'none');
             
-            // Lemparkan ke halaman yang sesuai tanpa harus klik Masuk lagi
-            if (r === 'admin') {
-                openPage('dash');
-            } else {
-                setupMapelGuru(userData.mapel);
-                openPage('absen');
-            }
+            // Kunci Tombol SOS hanya untuk Guru
+            const btnSos = document.querySelector('.fab-help');
+            if(btnSos) btnSos.style.display = r === 'guru' ? 'flex' : 'none';
+            
+            resetIdleTimer();
+            r === 'admin' ? openPage('dash') : (setupMapelGuru(userData.mapel), openPage('absen'));
         } else {
-            // Jika profil tidak ada (mungkin dihapus manual dari DB), hapus sesi palsu
             await sp.auth.signOut();
         }
     } else {
-        // Jika tidak ada tiket, biarkan layar login tetap muncul
         document.getElementById('login-layer').style.display = 'flex';
         document.getElementById('app-shell').style.display = 'none';
     }
 }
 
-// Jalankan saat dokumen pertama kali dimuat
 document.addEventListener("DOMContentLoaded", () => {
     const elTgl = document.getElementById('n-tgl');
     if(elTgl) elTgl.value = new Date().toLocaleDateString('en-CA');
-    
-    // Panggil detektif penjaga pintu
     cekSesiAktif();
 });
 
@@ -99,39 +114,38 @@ async function doLogin() {
     const secretEmail = `${u}@spetaga.com`;
     
     try {
-        const { data: authData, error: authErr } = await sp.auth.signInWithPassword({ email: secretEmail, password: p });
+        const { error: authErr } = await sp.auth.signInWithPassword({ email: secretEmail, password: p });
         if (authErr) throw new Error("Akses Ditolak!");
-
-        const { data: userData } = await sp.from('users').select('*').eq('username', u).maybeSingle();
+        
         ui.btnLoading(false, "MASUK");
-
-        if (userData) {
-            activeUser = userData;
-            document.getElementById('login-layer').style.display = 'none';
-            document.getElementById('app-shell').style.display = 'block';
-            
-            const r = userData.role.toLowerCase();
-            document.querySelectorAll('.admin-only').forEach(e => e.style.display = r === 'admin' ? 'flex' : 'none');
-            document.querySelectorAll('.guru-only').forEach(e => e.style.display = r === 'guru' ? 'flex' : 'none');
-            
-            ui.success(`Halo, ${userData.nama_lengkap || userData.username}!`);
-            r === 'admin' ? openPage('dash') : (setupMapelGuru(userData.mapel), openPage('absen'));
-        } else {
-            showLoginError("Data profil pengguna tidak ditemukan.");
-        }
-    } catch(e) { ui.btnLoading(false, "MASUK"); showLoginError("Gagal terhubung ke database."); }
+        cekSesiAktif(); 
+    } catch(e) { ui.btnLoading(false, "MASUK"); showLoginError("Gagal Login. Periksa kredensial."); }
 }
 
 async function doLogout() { 
-    // Hapus tiket masuk dari brankas browser
+    clearTimeout(idleTimer);
     await sp.auth.signOut(); 
     location.reload(); 
 }
 document.querySelector('.btn-logout').onclick = doLogout;
 
+// FUNGSI BANTUAN WA MELAYANG (FAB)
+function hubungiAdmin() {
+    // GANTI NOMOR DI BAWAH INI (FORMAT: 628...)
+    const nomorWA = "6281234567890"; 
+    const namaUser = activeUser ? (activeUser.nama_lengkap || activeUser.username) : "User";
+    const pesanMentah = `Halo Admin SPETAGA, saya ${namaUser} butuh bantuan terkait penggunaan sistem aplikasi.`;
+    const pesanEncoded = encodeURIComponent(pesanMentah);
+    window.open(`https://wa.me/${nomorWA}?text=${pesanEncoded}`, '_blank');
+}
+
+// ==========================================
+// 3. NAVIGASI UTAMA
+// ==========================================
 function openPage(id) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    
     const target = document.getElementById('pg-'+id);
     if(target) target.classList.add('active');
     document.getElementById('n-'+id)?.classList.add('active');
@@ -158,12 +172,13 @@ function setupMapelGuru(s) {
 }
 
 // ==========================================
-// 3. ABSENSI
+// 4. ABSENSI
 // ==========================================
 async function loadSiswaAbsen() {
     const kls = document.getElementById('sel-kls').value; const mpl = document.getElementById('mapel-select').value;
     if(!kls || !mpl) return;
     const tgl = new Date().toLocaleDateString('en-CA');
+    
     const { data: ex } = await sp.from('absensi').select('id').eq('kelas',kls).eq('mapel',mpl).eq('tanggal',tgl).limit(1);
 
     if(ex?.length > 0) {
@@ -193,7 +208,7 @@ async function saveAbsen() {
 }
 
 // ==========================================
-// 4. PENILAIAN AKADEMIK
+// 5. PENILAIAN AKADEMIK
 // ==========================================
 async function loadSiswaNilai() {
     const kls = document.getElementById('n-sel-kls').value;
@@ -237,7 +252,6 @@ async function saveNilai() {
     const tgl = document.getElementById('n-tgl').value;
     const mplSelect = document.getElementById('mapel-select');
     const mpl = mplSelect ? mplSelect.value : (activeUser.mapel || 'Umum'); 
-    
     const identitasGuru = activeUser.nama_lengkap || activeUser.username;
 
     const inputs = document.querySelectorAll('.input-nilai-massal');
@@ -353,8 +367,15 @@ async function hapusNilaiTunggal(id, nama) {
 }
 
 // ==========================================
-// 5. DASHBOARD & REKAP
+// 6. DASHBOARD & REKAP ABSENSI
 // ==========================================
+async function updateNamaFilter() {
+    const kls = document.getElementById('dash-f-kelas').value; const sel = document.getElementById('dash-f-nama');
+    if (!sel) return; sel.innerHTML = '<option value="">Semua Nama</option>'; if(!kls) return;
+    const { data } = await sp.from('database_siswa').select('nama').eq('kelas',kls).order('nama',{ascending:true});
+    data?.forEach(s => { sel.innerHTML += `<option value="${s.nama}">${s.nama}</option>`; });
+}
+
 async function viewRekap() {
     const kls = document.getElementById('dash-f-kelas').value; 
     const t1 = document.getElementById('dash-f-tgl-mulai').value;
@@ -394,15 +415,12 @@ async function popEdit(id, n, s) {
 }
 
 // ==========================================
-// 6. ADMIN TOOLS: EKSPOR PDF & CSV
+// 7. ADMIN TOOLS: EKSPOR PDF & CSV
 // ==========================================
-
 window.toggleFilterTugas = function() {
     const jns = document.getElementById('p-jenis').value;
     const wrap = document.getElementById('wrap-p-ket');
-    if(wrap) {
-        wrap.style.display = (jns === 'absen') ? 'none' : 'block';
-    }
+    if(wrap) wrap.style.display = (jns === 'absen') ? 'none' : 'block';
 }
 
 async function updateModalFilter() {
@@ -614,7 +632,7 @@ async function eksporNilaiCSV(f) {
 }
 
 // ==========================================
-// 7. MASTER DATA SISWA & USER
+// 8. MASTER DATA SISWA & USER
 // ==========================================
 async function viewSiswa() {
     const f = document.getElementById('f-kls-siswa').value;
@@ -638,13 +656,6 @@ async function delSiswa(id) {
 async function editSiswa(id, n, k) {
     const { value: f } = await Swal.fire({ title: 'Edit Siswa', html: `<input id="e-n" class="swal2-input" value="${n}"><select id="e-k" class="swal2-input"><option value="7" ${k==='7'?'selected':''}>7</option><option value="8" ${k==='8'?'selected':''}>8</option><option value="9" ${k==='9'?'selected':''}>9</option></select>`, preConfirm: () => [document.getElementById('e-n').value, document.getElementById('e-k').value] });
     if(f) { await sp.from('database_siswa').update({nama:f[0].toUpperCase(), kelas:f[1]}).eq('id',id); viewSiswa(); }
-}
-
-async function updateNamaFilter() {
-    const kls = document.getElementById('dash-f-kelas').value; const sel = document.getElementById('dash-f-nama');
-    if (!sel) return; sel.innerHTML = '<option value="">Semua Nama</option>'; if(!kls) return;
-    const { data } = await sp.from('database_siswa').select('nama').eq('kelas',kls).order('nama',{ascending:true});
-    data?.forEach(s => { sel.innerHTML += `<option value="${s.nama}">${s.nama}</option>`; });
 }
 
 async function viewUser() {
