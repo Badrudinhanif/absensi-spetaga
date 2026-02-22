@@ -313,51 +313,178 @@ async function showCetakModal() {
 }
 
 async function eksporAbsensiPDF(f) {
-    if(!f.k) return ui.errorGeneral("Pilih Kelas!"); Swal.fire({ title: 'Menyiapkan...', didOpen: () => Swal.showLoading()});
-    let q = sp.from('absensi').select('*'); if(f.k) q = q.eq('kelas', f.k); if(f.n) q = q.eq('nama', f.n); if(f.t1) q = q.gte('tanggal', f.t1); if(f.t2) q = q.lte('tanggal', f.t2);
-    const { data } = await q.order('tanggal').order('nama'); if(!data?.length) { Swal.close(); return ui.errorGeneral("Data kosong."); }
-    const rekap = {}; data.forEach(r => { if (!rekap[r.nama]) rekap[r.nama] = { H: 0, I: 0, S: 0, A: 0, Kelas: r.kelas }; if (r.status === 'Hadir') rekap[r.nama].H++; else if (r.status === 'Izin') rekap[r.nama].I++; else if (r.status === 'Sakit') rekap[r.nama].S++; else if (r.status === 'Alfa') rekap[r.nama].A++; });
+    if(!f.k) return ui.errorGeneral("Pilih Kelas terlebih dahulu!");
+    Swal.fire({ title: 'Menyiapkan PDF...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
+    
+    let q = sp.from('absensi').select('*');
+    if(f.k) q = q.eq('kelas', f.k); if(f.n) q = q.eq('nama', f.n); if(f.t1) q = q.gte('tanggal', f.t1); if(f.t2) q = q.lte('tanggal', f.t2);
+    
+    const { data } = await q.order('tanggal', {ascending:true}).order('nama', {ascending:true});
+    if(!data?.length) { Swal.close(); return ui.errorGeneral("Data kosong pada filter tersebut."); }
+
+    const rekapHitung = {};
+    data.forEach(r => {
+        if (!rekapHitung[r.nama]) rekapHitung[r.nama] = { H: 0, I: 0, S: 0, A: 0, Kelas: r.kelas };
+        if (r.status === 'Hadir') rekapHitung[r.nama].H++; else if (r.status === 'Izin') rekapHitung[r.nama].I++; else if (r.status === 'Sakit') rekapHitung[r.nama].S++; else if (r.status === 'Alfa') rekapHitung[r.nama].A++;
+    });
+    const dataRekapList = Object.keys(rekapHitung).map((nama, index) => [index + 1, nama, rekapHitung[nama].Kelas, rekapHitung[nama].H, rekapHitung[nama].I, rekapHitung[nama].S, rekapHitung[nama].A]);
+
     const { jsPDF } = window.jspdf; const doc = new jsPDF();
-    doc.text(`LAPORAN ABSENSI KELAS ${f.k}`, 14, 20);
-    doc.autoTable({ startY: 30, head: [['No', 'Nama', 'Kls', 'H', 'I', 'S', 'A']], body: Object.keys(rekap).map((n, i) => [i + 1, n, rekap[n].Kelas, rekap[n].H, rekap[n].I, rekap[n].S, rekap[n].A]), theme: 'grid' });
-    doc.save(`Absensi_Kls${f.k}.pdf`); Swal.close();
+    const logoBase64 = await getBase64Image('logo.png');
+
+    if (logoBase64) doc.addImage(logoBase64, 'PNG', 14, 10, 20, 20);
+    doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("LAPORAN REKAPITULASI ABSENSI", 40, 18);
+    doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text("SMP TAKHASSUS AL-QUR'AN 3", 40, 24);
+    
+    let subText = ""; if (f.k) subText += `Kelas: ${f.k}    `; 
+    if (f.t1 && f.t2) subText += `Periode: ${formatTgl(f.t1)} s.d ${formatTgl(f.t2)}`;
+    if (subText) { doc.setFontSize(9); doc.text(subText, 14, 38); }
+
+    doc.autoTable({ startY: subText ? 42 : 35, head: [['No', 'Nama Siswa', 'Kls', 'Hadir', 'Izin', 'Sakit', 'Alfa']], body: dataRekapList, theme: 'grid', headStyles: { fillColor: [0, 123, 94] } });
+
+    doc.addPage();
+    if (logoBase64) doc.addImage(logoBase64, 'PNG', 14, 10, 15, 15);
+    doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.text("RINCIAN ABSENSI HARIAN", 35, 18);
+    
+    const bodyRincian = [];
+    let currentDate = '';
+    let noUrut = 1;
+
+    data.forEach(r => {
+        if (r.tanggal !== currentDate) {
+            currentDate = r.tanggal;
+            noUrut = 1; 
+            bodyRincian.push([{
+                content: `TANGGAL: ${formatTgl(currentDate)}`,
+                colSpan: 5,
+                styles: { halign: 'center', fillColor: [226, 232, 240], textColor: [15, 23, 42], fontStyle: 'bold' }
+            }]);
+        }
+        bodyRincian.push([noUrut++, r.nama, r.kelas, r.mapel, r.status]);
+    });
+
+    doc.autoTable({ 
+        startY: 30, 
+        head: [['No', 'Nama Siswa', 'Kls', 'Mapel', 'Status']], 
+        body: bodyRincian, 
+        theme: 'grid', 
+        headStyles: { fillColor: [0, 123, 94] } 
+    });
+    
+    let fileName = "Rekap_Absensi"; if (f.k) fileName += `_Kls${f.k}`; if (f.n) fileName += `_${f.n.replace(/\s+/g, '')}`;
+    doc.save(`${fileName}.pdf`); Swal.close();
 }
 
 async function eksporNilaiPDF(f) {
-    if(!f.k) return ui.errorGeneral("Pilih Kelas!"); Swal.fire({ title: 'Menyiapkan...', didOpen: () => Swal.showLoading() });
-    let q = sp.from('nilai_siswa').select('*').eq('kelas', f.k); if(f.n) q = q.eq('nama_siswa', f.n); if(f.ket) q = q.eq('keterangan', f.ket); if(f.t1) q = q.gte('tanggal', f.t1); if(f.t2) q = q.lte('tanggal', f.t2);
-    const { data } = await q.order('tanggal').order('nama_siswa'); if(!data?.length) { Swal.close(); return ui.errorGeneral("Data kosong."); }
-    const { jsPDF } = window.jspdf; const doc = new jsPDF();
-    const groups = data.reduce((acc, curr) => { if (!acc[curr.keterangan]) acc[curr.keterangan] = []; acc[curr.keterangan].push(curr); return acc; }, {});
-    Object.keys(groups).forEach((judul, idx) => {
-        if (idx > 0) doc.addPage();
-        doc.text(`DAFTAR NILAI - ${judul} - KELAS ${f.k}`, 14, 20);
-        doc.autoTable({ startY: 30, head: [['No', 'Nama Siswa', 'Nilai']], body: groups[judul].map((r, i) => [i + 1, r.nama_siswa, r.nilai]) });
+    if(!f.k) return ui.errorGeneral("Pilih Kelas terlebih dahulu!");
+    Swal.fire({ title: 'Menyiapkan PDF Mading...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    
+    let q = sp.from('nilai_siswa').select('*').eq('kelas', f.k);
+    if(f.n) q = q.eq('nama_siswa', f.n);
+    if(f.ket) q = q.eq('keterangan', f.ket); 
+    if(f.t1) q = q.gte('tanggal', f.t1);
+    if(f.t2) q = q.lte('tanggal', f.t2);
+    
+    const { data } = await q.order('tanggal', {ascending:true}).order('nama_siswa', {ascending:true});
+    if(!data?.length) { Swal.close(); return ui.errorGeneral("Data nilai kosong pada filter tersebut."); }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const logoBase64 = await getBase64Image('logo.png');
+    
+    const groups = data.reduce((acc, curr) => {
+        if (!acc[curr.keterangan]) acc[curr.keterangan] = [];
+        acc[curr.keterangan].push(curr);
+        return acc;
+    }, {});
+
+    const listTugas = Object.keys(groups);
+    
+    listTugas.forEach((judulTugas, index) => {
+        if (index > 0) doc.addPage();
+        
+        if(logoBase64) doc.addImage(logoBase64, 'PNG', 14, 10, 18, 18);
+        doc.setFontSize(14); doc.setFont("helvetica", "bold");
+        doc.text("DAFTAR NILAI SISWA", 38, 18);
+        doc.setFontSize(10); doc.setFont("helvetica", "normal");
+        doc.text(`SMP TAKHASSUS AL-QUR'AN 3 - KELAS ${f.k}`, 38, 24);
+        
+        doc.setLineWidth(0.5); doc.line(14, 30, 196, 30);
+        
+        doc.setFontSize(11); doc.setFont("helvetica", "bold");
+        doc.text(`NAMA TUGAS/UJIAN: ${judulTugas.toUpperCase()}`, 14, 40);
+        
+        doc.setFontSize(9); doc.setFont("helvetica", "normal");
+        const meta = groups[judulTugas][0]; 
+        doc.text(`Mata Pelajaran: ${meta.mapel}   |   Guru Pengampu: ${meta.guru}   |   Tanggal: ${formatTgl(meta.tanggal)}`, 14, 46);
+
+        const rows = groups[judulTugas].map((r, i) => [i + 1, r.nama_siswa, r.nilai]);
+        
+        doc.autoTable({
+            startY: 52, head: [['No', 'Nama Siswa', 'Nilai Angka']], body: rows, theme: 'grid',
+            headStyles: { fillColor: [245, 158, 11] }, styles: { fontSize: 10, cellPadding: 3, textColor: [15, 23, 42] },
+            columnStyles: { 0: { halign: 'center', cellWidth: 15 }, 2: { halign: 'center', fontStyle: 'bold' } }
+        });
     });
-    doc.save(`Nilai_Mading_Kls${f.k}.pdf`); Swal.close();
+
+    let fileName = `Nilai_Mading_Kelas_${f.k}`;
+    doc.save(`${fileName}.pdf`);
+    Swal.close();
 }
 
 async function eksporNilaiCSV(f) {
-    if(!f.k) return ui.errorGeneral("Pilih Kelas!"); Swal.fire({ title: 'Menyiapkan...', didOpen: () => Swal.showLoading()});
-    let q = sp.from('nilai_siswa').select('*'); if(f.k) q = q.eq('kelas', f.k); if(f.n) q = q.eq('nama_siswa', f.n); if(f.ket) q = q.eq('keterangan', f.ket); if(f.t1) q = q.gte('tanggal', f.t1); if(f.t2) q = q.lte('tanggal', f.t2);
-    const { data } = await q.order('kelas').order('nama_siswa').order('tanggal'); if(!data?.length) { Swal.close(); return ui.errorGeneral("Data kosong."); }
-    let csvData = "Tanggal,Kelas,Mapel,Guru,Siswa,Jenis,Tugas,Nilai\n";
-    data.forEach(r => csvData += `"${r.tanggal}","${r.kelas}","${r.mapel}","${r.guru}","${r.nama_siswa}","${r.jenis_nilai}","${r.keterangan}","${r.nilai}"\n`);
-    const link = document.createElement("a"); link.setAttribute("href", URL.createObjectURL(new Blob([csvData], { type: 'text/csv;charset=utf-8;' }))); link.setAttribute("download", `Nilai_Kls${f.k}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); Swal.close();
+    if(!f.k) return ui.errorGeneral("Pilih Kelas terlebih dahulu!");
+    Swal.fire({ title: 'Menyiapkan Excel...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
+    
+    let q = sp.from('nilai_siswa').select('*');
+    if(f.k) q = q.eq('kelas', f.k); if(f.n) q = q.eq('nama_siswa', f.n); if(f.ket) q = q.eq('keterangan', f.ket);
+    if(f.t1) q = q.gte('tanggal', f.t1); if(f.t2) q = q.lte('tanggal', f.t2);
+    
+    const { data } = await q.order('kelas', {ascending:true}).order('nama_siswa', {ascending:true}).order('tanggal', {ascending:true});
+    if(!data?.length) { Swal.close(); return ui.errorGeneral("Data nilai kosong pada filter tersebut."); }
+
+    let csvData = "Tanggal,Kelas,Mata Pelajaran,Nama Guru,Nama Siswa,Jenis Penilaian,Judul Tugas/Ujian,Nilai Angka\n";
+    data.forEach(r => { csvData += `"${r.tanggal}","${r.kelas}","${r.mapel}","${r.guru}","${r.nama_siswa}","${r.jenis_nilai}","${r.keterangan}","${r.nilai}"\n`; });
+
+    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a"); const url = URL.createObjectURL(blob); link.setAttribute("href", url);
+    let fileName = "Rekap_Nilai_Akademik"; if (f.k) fileName += `_Kelas${f.k}`;
+    link.setAttribute("download", `${fileName}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    Swal.close();
 }
 
+// ==========================================
+// 7. MASTER DATA SISWA & USER
+// ==========================================
 async function viewSiswa() {
-    const f = document.getElementById('f-kls-siswa').value; let q = sp.from('database_siswa').select('*').order('nama'); if(f) q = q.eq('kelas', f);
-    const { data } = await q; const tb = document.getElementById('tb-siswa'); tb.innerHTML = "";
-    data?.forEach(s => tb.innerHTML += `<tr><td>${s.nama}</td><td>${s.kelas}</td><td><button onclick="editSiswa('${s.id}','${s.nama}','${s.kelas}')" style="background:#3498db; color:white; border:none; padding:5px; border-radius:5px">✎</button> <button onclick="delSiswa('${s.id}')" style="background:#e74c3c; color:white; border:none; padding:5px; border-radius:5px">🗑</button></td></tr>`);
+    const f = document.getElementById('f-kls-siswa').value;
+    let q = sp.from('database_siswa').select('*').order('nama',{ascending:true}); if(f) q = q.eq('kelas', f);
+    const { data } = await q;
+    const tb = document.getElementById('tb-siswa'); if(!tb) return; tb.innerHTML = "";
+    data?.forEach(s => { tb.innerHTML += `<tr><td>${s.nama}</td><td>${s.kelas}</td><td><button onclick="editSiswa('${s.id}','${s.nama}','${s.kelas}')" style="background:#3498db; color:white; border:none; padding:5px; border-radius:5px">âœŽ</button> <button onclick="delSiswa('${s.id}')" style="background:#e74c3c; color:white; border:none; padding:5px; border-radius:5px">ðŸ—‘</button></td></tr>`; });
 }
-async function addSiswa() { const n = document.getElementById('in-nama-s').value; const k = document.getElementById('in-kls-s').value; if(!n) return; await sp.from('database_siswa').insert([{nama: n.toUpperCase(), kelas: k}]); document.getElementById('in-nama-s').value = ""; viewSiswa(); }
-async function delSiswa(id) { ui.confirm("Hapus?","", async () => { await sp.from('database_siswa').delete().eq('id',id); viewSiswa(); }); }
-async function editSiswa(id, n, k) { const { value: f } = await Swal.fire({ title: 'Edit', html: `<input id="e-n" class="swal2-input" value="${n}"><select id="e-k" class="swal2-input"><option value="7" ${k==='7'?'selected':''}>7</option><option value="8" ${k==='8'?'selected':''}>8</option><option value="9" ${k==='9'?'selected':''}>9</option></select>`, preConfirm: () => [document.getElementById('e-n').value, document.getElementById('e-k').value] }); if(f) { await sp.from('database_siswa').update({nama:f[0].toUpperCase(), kelas:f[1]}).eq('id',id); viewSiswa(); } }
 
-async function viewUser() {
-    const { data } = await sp.from('users').select('*').order('username'); const tb = document.getElementById('tb-user'); tb.innerHTML = "";
-    data?.forEach(u => tb.innerHTML += `<tr><td>${u.username}</td><td>${u.nama_lengkap || '-'}</td><td>${u.mapel || '-'}</td><td>${u.role}</td><td><button onclick="showUserModal('${u.username}','${u.username}','${u.password}','${u.mapel}','${u.role}','${u.nama_lengkap}')" style="background:var(--p); color:white; border:none; padding:5px 10px; border-radius:5px">Edit</button></td></tr>`);
+async function addSiswa() { 
+    const n = document.getElementById('in-nama-s').value; const k = document.getElementById('in-kls-s').value; 
+    if(!n) return ui.errorGeneral("Nama Kosong!"); 
+    await sp.from('database_siswa').insert([{nama: n.toUpperCase(), kelas: k}]); 
+    document.getElementById('in-nama-s').value = ""; viewSiswa(); 
+}
+
+async function delSiswa(id) { 
+    ui.confirm("Hapus?","Data hilang permanen.", async () => { await sp.from('database_siswa').delete().eq('id',id); viewSiswa(); }); 
+}
+
+async function editSiswa(id, n, k) {
+    const { value: f } = await Swal.fire({ title: 'Edit Siswa', html: `<input id="e-n" class="swal2-input" value="${n}"><select id="e-k" class="swal2-input"><option value="7" ${k==='7'?'selected':''}>7</option><option value="8" ${k==='8'?'selected':''}>8</option><option value="9" ${k==='9'?'selected':''}>9</option></select>`, preConfirm: () => [document.getElementById('e-n').value, document.getElementById('e-k').value] });
+    if(f) { await sp.from('database_siswa').update({nama:f[0].toUpperCase(), kelas:f[1]}).eq('id',id); viewSiswa(); }
+}
+
+async function updateNamaFilter() {
+    const kls = document.getElementById('dash-f-kelas').value; const sel = document.getElementById('dash-f-nama');
+    if (!sel) return; sel.innerHTML = '<option value="">Semua Nama</option>'; if(!kls) return;
+    const { data } = await sp.from('database_siswa').select('nama').eq('kelas',kls).order('nama',{ascending:true});
+    data?.forEach(s => { sel.innerHTML += `<option value="${s.nama}">${s.nama}</option>`; });
 }
 async function showUserModal(old_u='', u='', p='', m='', r='guru', nl='') {
     const isEdit = old_u !== ''; 
