@@ -131,7 +131,7 @@ document.querySelector('.btn-logout').onclick = doLogout;
 
 // FUNGSI BANTUAN WA MELAYANG (FAB)
 function hubungiAdmin() {
-    const nomorWA = "6281234567890"; // <--- GANTI NOMOR INI
+    const nomorWA = "6285800022010"; // <--- GANTI NOMOR INI
     const namaUser = activeUser ? (activeUser.nama_lengkap || activeUser.username) : "User";
     const pesanEncoded = encodeURIComponent(`Halo Admin SPETAGA, saya ${namaUser} butuh bantuan terkait penggunaan sistem aplikasi.`);
     window.open(`https://wa.me/${nomorWA}?text=${pesanEncoded}`, '_blank');
