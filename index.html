@@ -42,25 +42,28 @@
             <span>SPETAGA</span>
         </div>
         <div class="mh-user">
-            
             <span id="mh-nama">Nama User</span>
             <button class="btn-logout mh-logout" title="Keluar">🚪</button>
         </div>
     </div>
+    
     <div class="sidebar">
         <div class="sidebar-brand">
             <img src="logo.png" alt="Logo" class="mini-logo" onerror="this.style.display='none'">
             <span>SPETAGA</span>
         </div>
         <nav>
-            <div class="nav-link" id="n-dash" onclick="openPage('dash')">📊<span>Dashboard</span></div>
+            <div class="nav-link admin-only guru-only" id="n-dash" onclick="openPage('dash')">📊<span>Dashboard</span></div>
             <div class="nav-link guru-only" id="n-absen" onclick="openPage('absen')">📝<span>Absensi</span></div>
             <div class="nav-link guru-only" id="n-nilai" onclick="openPage('nilai')">💯<span>Nilai</span></div>
+            
+            <div class="nav-link guru-only" id="n-tugas-masuk" onclick="openPage('tugas-masuk')" style="display: none;">📥<span>Tugas Masuk</span></div>
+            
             <div class="nav-link admin-only" id="n-siswa" onclick="openPage('siswa')">👥<span>Siswa</span></div>
             <div class="nav-link admin-only" id="n-user" onclick="openPage('user')">🔐<span>User</span></div>
-            <div class="nav-link" onclick="showCetakModal()">🖨️<span>Ekspor Data</span></div>
-            
-            <div class="nav-link btn-logout mobile-only" style="color:#ef4444;">🚪<span>Keluar</span></div>
+            <div class="nav-link siswa-only" id="n-siswa-rapor" onclick="openPage('siswa-rapor')" style="display: none;">📈<span>Rapor Akademik</span></div>
+            <div class="nav-link siswa-only" id="n-siswa-tugas" onclick="openPage('siswa-tugas')" style="display: none;">📤<span>Kumpul Tugas</span></div>
+            <div class="nav-link admin-only guru-only" onclick="showCetakModal()">🖨️<span>Ekspor Data</span></div>
 
             <div id="sidebar-profile" class="desktop-only" style="display:none;">
                 <div class="profile-info">
@@ -70,9 +73,7 @@
                         <div id="profil-role" class="profile-role">Role</div>
                     </div>
                 </div>
-                <button class="btn-logout sidebar-btn-logout">
-                    🚪 <span>Keluar</span>
-                </button>
+                <button class="btn-logout sidebar-btn-logout">🚪 <span>Keluar</span></button>
             </div>
         </nav>
     </div>
@@ -152,7 +153,6 @@
 
         <div id="pg-siswa" class="page admin-only">
             <h2 style="margin-top:0">Master Data Siswa</h2>
-            
             <div class="card desktop-flex" style="background: #f0fdf4; border-color: #10b981; margin-bottom: 15px;">
                 <div style="flex:1">
                     <strong style="color: #004d3b; display:block; margin-bottom:5px;">Import Massal via CSV</strong>
@@ -176,12 +176,125 @@
         </div>
 
         <div id="pg-user" class="page admin-only">
-            <h2 style="margin-top:0">Kelola Pengguna (Guru/Admin)</h2>
-            <button onclick="showUserModal()" class="btn-save" style="margin-bottom:20px">+ TAMBAH USER</button>
+            <h2 style="margin-top:0">Kelola Pengguna (Sistem)</h2>
+            <div class="card desktop-flex" style="margin-bottom:20px; padding: 15px;">
+                <select id="f-role-user" onchange="viewUser()" style="flex:2">
+                    <option value="">Semua Role</option>
+                    <option value="admin">Admin</option>
+                    <option value="guru">Guru</option>
+                    <option value="siswa">Siswa</option>
+                </select>
+                <button onclick="showUserModal()" class="btn-save" style="flex:1">+ TAMBAH USER</button>
+            </div>
             <div class="card no-padding">
-                <table><thead><tr><th>Username</th><th>Nama Lengkap</th><th>Mapel</th><th>Role</th><th>Aksi</th></tr></thead><tbody id="tb-user"></tbody></table>
+                <table><thead><tr><th>Username</th><th>Nama</th><th>Detail</th><th>Role</th><th>Aksi</th></tr></thead><tbody id="tb-user"></tbody></table>
             </div>
         </div>
+
+        <div id="pg-siswa-rapor" class="page siswa-only" style="display: none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 5px; margin-top:0;">
+                <h2 style="margin:0;">Rapor Akademik Saya</h2>
+                <button onclick="ubahPasswordPribadi()" class="btn-save" style="background:#3b82f6; color:white; padding:8px 15px; font-size:0.85rem; border-radius:6px; box-shadow:none;">🔑 Ubah Password</button>
+            </div>
+            <p style="color: var(--t-light); margin-bottom: 20px;">Data di bawah ini ditarik secara langsung dari catatan guru pengajar.</p>
+            
+            <div class="card" style="margin-bottom: 20px;">
+                <h3>Riwayat Kehadiran</h3>
+                <div class="desktop-flex" style="gap:10px; margin-bottom: 15px;">
+                    <input type="date" id="f-siswa-abs-t1" style="flex:1">
+                    <input type="date" id="f-siswa-abs-t2" style="flex:1">
+                    <button onclick="loadSiswaAbsenFiltered()" class="btn-save" style="flex:1; padding:12px;">CARI ABSEN</button>
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead><tr><th>Tanggal</th><th>Mapel</th><th>Status</th><th>Guru</th></tr></thead>
+                        <tbody id="tb-siswa-absen">
+                            <tr><td colspan="4" style="text-align:center;">Memuat data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Riwayat Nilai</h3>
+                <div class="desktop-flex" style="gap:10px; margin-bottom: 15px;">
+                    <select id="f-siswa-nilai-guru" style="flex:2">
+                        <option value="">-- Memuat Daftar Guru... --</option>
+                    </select>
+                    <button onclick="loadSiswaNilaiFiltered()" class="btn-save" style="flex:1; padding:12px;">LIHAT NILAI</button>
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead><tr><th>Tanggal</th><th>Mapel</th><th>Nama Tugas</th><th>Nilai</th><th>Guru</th></tr></thead>
+                        <tbody id="tb-siswa-nilai">
+                            <tr><td colspan="5" style="text-align:center;">Silakan pilih guru terlebih dahulu.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="pg-siswa-tugas" class="page siswa-only" style="display: none;">
+            <h2 style="margin-top:0;">Kumpul Tugas Akademik</h2>
+            <div class="card">
+                <div style="margin-bottom:15px;">
+                    <label style="font-weight:bold; display:block; margin-bottom:5px;">Pilih Guru Tujuan</label>
+                    <select id="in-siswa-tugas-guru" class="swal2-input" style="width:100%; margin:0; box-sizing:border-box;">
+                        <option value="">-- Memuat Guru... --</option>
+                    </select>
+                </div>
+                <div style="margin-bottom:15px;">
+                    <label style="font-weight:bold; display:block; margin-bottom:5px;">Nama Tugas (Sesuai Arahan Guru)</label>
+                    <input type="text" id="in-siswa-namatugas" class="swal2-input" placeholder="Contoh: Tugas TIK Modul 1" style="width:100%; margin:0; box-sizing:border-box;">
+                </div>
+                <div style="margin-bottom:20px;">
+                    <label style="font-weight:bold; display:block; margin-bottom:5px;">File Tugas (PDF / Word)</label>
+                    <input type="file" id="in-siswa-file" accept=".pdf,.doc,.docx" style="width:100%; padding:10px; border:2px dashed #cbd5e1; border-radius:8px; background:#f8fafc;">
+                    <small style="color:red; display:block; margin-top:5px;">*Maksimal ukuran file: 5 MB.</small>
+                </div>
+                <button onclick="uploadTugasSiswa()" class="btn-save" style="width:100%;"><i class="fas fa-upload"></i> 📤 Unggah Tugas Sekarang</button>
+            </div>
+            
+            <h3 style="margin-top:30px;">Riwayat Tugas Terkumpul</h3>
+            <div class="desktop-flex" style="gap:10px; margin-bottom: 15px;">
+                <select id="f-siswa-riwayat-guru" style="flex:2">
+                    <option value="">Semua Guru (Memuat...)</option>
+                </select>
+                <button onclick="loadRiwayatTugasSiswa()" class="btn-save" style="flex:1; padding:12px;">FILTER</button>
+            </div>
+            <div class="card no-padding">
+                <div class="table-responsive">
+                    <table>
+                        <thead><tr><th>Tanggal & Tujuan</th><th>Nama Tugas</th><th>File</th></tr></thead>
+                        <tbody id="tb-siswa-riwayat-tugas">
+                            <tr><td colspan="3" style="text-align:center;">Memuat data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="pg-tugas-masuk" class="page guru-only" style="display: none;">
+            <h2 style="margin-top:0;">Tugas Masuk dari Siswa</h2>
+            <div class="card desktop-flex" style="gap:10px; margin-bottom: 20px;">
+                <select id="f-guru-tugas-kls" style="flex:1" onchange="loadTugasMasukGuru()">
+                    <option value="">Semua Kelas</option><option value="7">Kelas 7</option><option value="8">Kelas 8</option><option value="9">Kelas 9</option>
+                </select>
+                <input type="date" id="f-guru-tugas-tgl" style="flex:1" onchange="loadTugasMasukGuru()">
+                <button onclick="loadTugasMasukGuru()" class="btn-save" style="flex:1; padding:12px;">CARI TUGAS</button>
+            </div>
+            <div class="card no-padding">
+                <div class="table-responsive">
+                    <table>
+                        <thead><tr><th>Tanggal</th><th>Siswa (Kelas)</th><th>Nama Tugas</th><th>Aksi</th></tr></thead>
+                        <tbody id="tb-guru-tugas-masuk">
+                            <tr><td colspan="4" style="text-align:center;">Pilih filter dan klik Cari Tugas.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 

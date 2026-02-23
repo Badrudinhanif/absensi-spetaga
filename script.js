@@ -88,14 +88,26 @@ async function cekSesiAktif() {
                     sideProfile.style.display = 'block';
                 }
 
-                document.querySelectorAll('.admin-only').forEach(e => e.style.display = r === 'admin' ? 'flex' : 'none');
-                document.querySelectorAll('.guru-only').forEach(e => e.style.display = r === 'guru' ? 'flex' : 'none');
+                // 1. Kunci paksa semua elemen yang memiliki batasan role
+                document.querySelectorAll('.admin-only, .guru-only, .siswa-only').forEach(e => e.style.display = 'none');
                 
+                // 2. Buka gembok HANYA untuk elemen yang sesuai dengan role user
+                if (r === 'admin') {
+                    document.querySelectorAll('.admin-only').forEach(e => e.style.display = 'flex');
+                } else if (r === 'guru') {
+                    document.querySelectorAll('.guru-only').forEach(e => e.style.display = 'flex');
+                } else if (r === 'siswa') {
+                    document.querySelectorAll('.siswa-only').forEach(e => e.style.display = 'flex');
+                }
+                // INJEKSI: Tampilkan tombol bantuan hanya untuk Guru dan Siswa
                 const btnSos = document.querySelector('.fab-help');
-                if(btnSos) btnSos.style.display = r === 'guru' ? 'flex' : 'none';
-                
+                if(btnSos) btnSos.style.display = (r === 'guru' || r === 'siswa') ? 'flex' : 'none';
+
                 resetIdleTimer();
-                r === 'admin' ? openPage('dash') : (setupMapelGuru(userData.mapel), openPage('absen'));
+                // INJEKSI PENGALIHAN OTOMATIS LOGIN
+                if (r === 'admin') { openPage('dash'); } 
+                else if (r === 'guru') { setupMapelGuru(userData.mapel); openPage('absen'); } 
+                else if (r === 'siswa') { openPage('siswa-rapor'); }
             } else {
                 await sp.auth.signOut();
                 throw new Error("User profil tidak ditemukan");
@@ -152,7 +164,7 @@ document.querySelectorAll('.btn-logout').forEach(btn => btn.onclick = doLogout);
 function hubungiAdmin() {
     const nomorWA = "6285800022010";
     const namaUser = activeUser ? (activeUser.nama_lengkap || activeUser.username) : "User";
-    const pesanEncoded = encodeURIComponent(`Halo Admin SPETAGA, saya ${namaUser} butuh bantuan terkait penggunaan sistem aplikasi.`);
+    const pesanEncoded = encodeURIComponent(`Assalamu'alaikum Pak, saya ${namaUser} butuh bantuan terkait penggunaan sistem aplikasi.`);
     window.open(`https://wa.me/${nomorWA}?text=${pesanEncoded}`, '_blank');
 }
 
@@ -167,6 +179,8 @@ function openPage(id) {
     document.getElementById('n-'+id)?.classList.add('active');
     window.scrollTo(0,0);
     if(id==='dash') viewRekap(); if(id==='siswa') viewSiswa(); if(id==='user') viewUser(); if(id==='nilai') updateDropdownTugas();
+    if(id==='siswa-rapor') loadRaporSiswa(); if(id==='siswa-tugas') loadRiwayatTugasSiswa();
+    if(id==='siswa-tugas') initHalamanTugasSiswa(); if(id==='tugas-masuk') loadTugasMasukGuru();
 }
 
 function setupMapelGuru(s) {
@@ -201,11 +215,41 @@ async function loadSiswaAbsen() {
 }
 
 async function saveAbsen() {
-    const kls = document.getElementById('sel-kls').value; const mpl = document.getElementById('mapel-select').value;
-    const logs = Array.from(document.querySelectorAll('.radio-group')).map(g => ({ nama: g.dataset.n, kelas: kls, mapel: mpl, tanggal: new Date().toLocaleDateString('en-CA'), status: g.querySelector('input:checked').value, guru: activeUser.nama_lengkap || activeUser.username }));
+    const kls = document.getElementById('sel-kls').value; 
+    const mpl = document.getElementById('mapel-select').value;
+    
+    // Tarik semua data dari radio button
+    const logs = Array.from(document.querySelectorAll('.radio-group')).map(g => ({ 
+        nama: g.dataset.n, 
+        kelas: kls, 
+        mapel: mpl, 
+        tanggal: new Date().toLocaleDateString('en-CA'), 
+        status: g.querySelector('input:checked').value, 
+        guru: activeUser.nama_lengkap || activeUser.username 
+    }));
+    
     ui.confirm("Simpan Absensi?", "Data akan dikunci untuk hari ini.", async () => {
+        // Kunci layar saat mengirim data agar guru tidak memencet tombol lain
+        Swal.fire({ title: 'Menyimpan Absensi...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+        
         const { error } = await sp.from('absensi').insert(logs);
-        if(!error) { ui.success("Berhasil!"); openPage('dash'); } else ui.errorGeneral(error.message);
+        Swal.close();
+        
+        if(!error) { 
+            ui.success("Berhasil disimpan!"); 
+            
+            // ==========================================
+            // PROTOKOL PEMBERSIHAN STATE (ANTI-KEBINGUNGAN)
+            // ==========================================
+            document.getElementById('sel-kls').value = ""; // Kembalikan dropdown kelas ke "Pilih Kelas"
+            document.getElementById('list-abs').innerHTML = ""; // Kosongkan daftar nama siswa
+            document.getElementById('btn-save').style.display = "none"; // Sembunyikan tombol simpan
+            
+            // Lempar ke Dashboard setelah layar bersih
+            openPage('dash'); 
+        } else {
+            ui.errorGeneral(error.message);
+        }
     });
 }
 
@@ -335,43 +379,232 @@ async function showCetakModal() {
     if(f) { if(f.j === 'absen') await eksporAbsensiPDF(f); else if (f.j === 'nilai-pdf') await eksporNilaiPDF(f); else if (f.j === 'nilai-csv') await eksporNilaiCSV(f); }
 }
 
+// ==========================================
+// MESIN CETAK PDF ABSENSI (FINAL & ANTI-CRASH)
+// ==========================================
 async function eksporAbsensiPDF(f) {
-    if(!f.k) return ui.errorGeneral("Pilih Kelas!"); Swal.fire({ title: 'Menyiapkan...', didOpen: () => Swal.showLoading()});
-    let q = sp.from('absensi').select('*'); if(f.k) q = q.eq('kelas', f.k); if(f.n) q = q.eq('nama', f.n); if(f.t1) q = q.gte('tanggal', f.t1); if(f.t2) q = q.lte('tanggal', f.t2);
-    if (activeUser && activeUser.role.toLowerCase() === 'guru') { q = q.eq('guru', activeUser.nama_lengkap || activeUser.username); }
-    const { data } = await q.order('tanggal').order('nama'); if(!data?.length) { Swal.close(); return ui.errorGeneral("Data kosong."); }
-    const rekap = {}; data.forEach(r => { if (!rekap[r.nama]) rekap[r.nama] = { H: 0, I: 0, S: 0, A: 0, Kelas: r.kelas }; if (r.status === 'Hadir') rekap[r.nama].H++; else if (r.status === 'Izin') rekap[r.nama].I++; else if (r.status === 'Sakit') rekap[r.nama].S++; else if (r.status === 'Alfa') rekap[r.nama].A++; });
-    const { jsPDF } = window.jspdf; const doc = new jsPDF();
-    doc.text(`LAPORAN ABSENSI KELAS ${f.k}`, 14, 20);
-    doc.autoTable({ startY: 30, head: [['No', 'Nama', 'Kls', 'H', 'I', 'S', 'A']], body: Object.keys(rekap).map((n, i) => [i + 1, n, rekap[n].Kelas, rekap[n].H, rekap[n].I, rekap[n].S, rekap[n].A]), theme: 'grid' });
-    doc.save(`Absensi_Kls${f.k}.pdf`); Swal.close();
+    if(!f.k) return ui.errorGeneral("Pilih Kelas!"); 
+    
+    // allowOutsideClick: false mencegah user iseng klik luar saat sistem sedang kerja keras
+    Swal.fire({ title: 'Menyiapkan Dokumen...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+    
+    try {
+        let q = sp.from('absensi').select('*'); 
+        if(f.k) q = q.eq('kelas', f.k); 
+        if(f.n) q = q.eq('nama', f.n); 
+        if(f.t1) q = q.gte('tanggal', f.t1); 
+        if(f.t2) q = q.lte('tanggal', f.t2);
+        
+        // Isolasi Data Guru
+        if (activeUser && activeUser.role.toLowerCase() === 'guru') {
+            q = q.eq('guru', activeUser.nama_lengkap || activeUser.username); 
+        }
+        
+        const { data, error } = await q.order('tanggal').order('nama'); 
+        if(error) throw error; // Lempar error ke blok catch jika database menolak
+        if(!data?.length) { Swal.close(); return ui.errorGeneral("Data kosong pada rentang waktu/kelas tersebut."); }
+
+        const { jsPDF } = window.jspdf; 
+        const doc = new jsPDF();
+        const logoImg = document.querySelector("img[src='logo.png']");
+
+        // FUNGSI KOP SURAT
+        const buatKopSurat = (d) => {
+            if(logoImg && logoImg.complete && logoImg.naturalWidth !== 0) {
+                try { d.addImage(logoImg, 'PNG', 14, 10, 15, 15); } catch(e) { console.warn("Logo gagal dimuat ke PDF"); }
+            }
+            d.setFontSize(14); d.setFont(undefined, 'bold'); d.setTextColor(0);
+            d.text("SMP TAKHASSUS AL-QUR'AN 3", 32, 16);
+            d.setFontSize(10); d.setFont(undefined, 'normal');
+            d.text("Laporan Rekapitulasi Absensi Akademik", 32, 22);
+            d.setLineWidth(0.5); d.line(14, 28, 196, 28);
+        };
+
+        // --- LEMBAR 1: REKAPITULASI TOTAL ---
+        buatKopSurat(doc);
+        doc.setFontSize(12); doc.setFont(undefined, 'bold');
+        doc.text(`REKAPITULASI TOTAL - KELAS ${f.k}`, 14, 38);
+        
+        const rekap = {}; 
+        data.forEach(r => { 
+            // Sabuk pengaman nama siswa (jika null)
+            const namaAman = r.nama || "Tanpa Nama";
+            if (!rekap[namaAman]) rekap[namaAman] = { H: 0, I: 0, S: 0, A: 0 }; 
+            
+            if (r.status === 'Hadir') rekap[namaAman].H++; 
+            else if (r.status === 'Izin') rekap[namaAman].I++; 
+            else if (r.status === 'Sakit') rekap[namaAman].S++; 
+            else if (r.status === 'Alfa') rekap[namaAman].A++; 
+        });
+
+        doc.autoTable({ 
+            startY: 43, 
+            head: [['No', 'Nama Siswa', 'Hadir', 'Izin', 'Sakit', 'Alfa']], 
+            body: Object.keys(rekap).map((n, i) => [i + 1, n, rekap[n].H, rekap[n].I, rekap[n].S, rekap[n].A]), 
+            theme: 'grid', headStyles: { fillColor: [0, 123, 94] }
+        });
+
+        // --- LEMBAR 2 DST: LOG HARIAN ---
+        const groupedByDate = data.reduce((acc, curr) => {
+            const tglAman = curr.tanggal || "Tanggal Tidak Valid";
+            if (!acc[tglAman]) acc[tglAman] = [];
+            acc[tglAman].push(curr); return acc;
+        }, {});
+
+        doc.addPage();
+        buatKopSurat(doc);
+        doc.setFontSize(12); doc.setFont(undefined, 'bold');
+        doc.text(`RINCIAN HARIAN - KELAS ${f.k}`, 14, 38);
+        
+        let currentY = 43;
+        
+        Object.keys(groupedByDate).forEach((tgl) => {
+            if (currentY > 240) { doc.addPage(); buatKopSurat(doc); currentY = 38; }
+            
+            doc.setFontSize(10); doc.setTextColor(80); doc.setFont(undefined, 'bold');
+            doc.text(`Tanggal: ${formatTgl(tgl)}`, 14, currentY);
+            
+            doc.autoTable({
+                startY: currentY + 3,
+                head: [['No', 'Nama Siswa', 'Mapel', 'Status', 'Guru']],
+                body: groupedByDate[tgl].map((r, i) => [i + 1, r.nama || "-", r.mapel || "-", r.status || "-", r.guru || "-"]),
+                theme: 'striped', styles: { fontSize: 8 },
+                headStyles: { fillColor: [51, 65, 85] }, margin: { bottom: 15 },
+                
+                // INJEKSI WARNA STATUS
+                didParseCell: function(data) {
+                    if (data.section === 'body' && data.column.index === 3) {
+                        data.cell.styles.fontStyle = 'bold';
+                        if (data.cell.raw === 'Hadir') data.cell.styles.textColor = [16, 185, 129];
+                        else if (data.cell.raw === 'Izin') data.cell.styles.textColor = [245, 158, 11];
+                        else if (data.cell.raw === 'Sakit') data.cell.styles.textColor = [59, 130, 246];
+                        else if (data.cell.raw === 'Alfa') data.cell.styles.textColor = [239, 68, 68];
+                    }
+                }
+            });
+            currentY = doc.lastAutoTable.finalY + 10; 
+        });
+
+        doc.save(`Absensi_Lengkap_Kls${f.k}.pdf`); 
+        
+    } catch (error) {
+        // Jika ada crash, sistem tidak akan nyangkut loading. Ia akan memunculkan popup error ini.
+        console.error("GAGAL CETAK PDF:", error);
+        ui.errorGeneral("Terjadi kesalahan saat membuat dokumen. Cek console (F12).");
+    } finally {
+        // Blok finally memastikan layar loading PASTI ditutup, apapun yang terjadi
+        Swal.close();
+    }
 }
 
+// ==========================================
+// MESIN CETAK PDF NILAI (KOP SURAT & METADATA HORIZONTAL)
+// ==========================================
 async function eksporNilaiPDF(f) {
-    if(!f.k) return ui.errorGeneral("Pilih Kelas!"); Swal.fire({ title: 'Menyiapkan...', didOpen: () => Swal.showLoading() });
-    let q = sp.from('nilai_siswa').select('*').eq('kelas', f.k); if(f.n) q = q.eq('nama_siswa', f.n); if(f.ket) q = q.eq('keterangan', f.ket); if(f.t1) q = q.gte('tanggal', f.t1); if(f.t2) q = q.lte('tanggal', f.t2);
-    if (activeUser && activeUser.role.toLowerCase() === 'guru') { q = q.eq('guru', activeUser.nama_lengkap || activeUser.username); }
-    const { data } = await q.order('tanggal').order('nama_siswa'); if(!data?.length) { Swal.close(); return ui.errorGeneral("Data kosong."); }
-    const { jsPDF } = window.jspdf; const doc = new jsPDF();
-    const groups = data.reduce((acc, curr) => { if (!acc[curr.keterangan]) acc[curr.keterangan] = []; acc[curr.keterangan].push(curr); return acc; }, {});
+    if(!f.k) return ui.errorGeneral("Pilih Kelas!"); 
+    Swal.fire({ title: 'Menyiapkan Dokumen...', didOpen: () => Swal.showLoading() });
+    
+    let q = sp.from('nilai_siswa').select('*').eq('kelas', f.k); 
+    if(f.n) q = q.eq('nama_siswa', f.n); if(f.ket) q = q.eq('keterangan', f.ket); if(f.t1) q = q.gte('tanggal', f.t1); if(f.t2) q = q.lte('tanggal', f.t2);
+    if (activeUser && activeUser.role.toLowerCase() === 'guru') q = q.eq('guru', activeUser.nama_lengkap || activeUser.username); 
+
+    const { data } = await q.order('tanggal').order('nama_siswa'); 
+    if(!data?.length) { Swal.close(); return ui.errorGeneral("Data kosong."); }
+    
+    const { jsPDF } = window.jspdf; 
+    const doc = new jsPDF();
+    const logoImg = document.querySelector("img[src='logo.png']");
+
+    const buatKopSurat = (d) => {
+        if(logoImg && logoImg.complete && logoImg.naturalWidth !== 0) {
+            try { d.addImage(logoImg, 'PNG', 14, 10, 15, 15); } catch(e) {}
+        }
+        d.setFontSize(14); d.setFont(undefined, 'bold');
+        d.text("SMP TAKHASSUS AL-QUR'AN 3", 32, 16);
+        d.setFontSize(10); d.setFont(undefined, 'normal');
+        d.text("Laporan Dokumen Penilaian Akademik", 32, 22);
+        d.setLineWidth(0.5); d.line(14, 28, 196, 28);
+    };
+
+    const groups = data.reduce((acc, curr) => { 
+        if (!acc[curr.keterangan]) acc[curr.keterangan] = []; 
+        acc[curr.keterangan].push(curr); return acc; 
+    }, {});
+    
     Object.keys(groups).forEach((judul, idx) => {
         if (idx > 0) doc.addPage();
-        doc.text(`DAFTAR NILAI - ${judul} - KELAS ${f.k}`, 14, 20);
-        doc.autoTable({ startY: 30, head: [['No', 'Nama Siswa', 'Nilai']], body: groups[judul].map((r, i) => [i + 1, r.nama_siswa, r.nilai]) });
+        buatKopSurat(doc);
+        
+        const info = groups[judul][0]; 
+        
+        doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.setTextColor(0);
+        doc.text(`DAFTAR NILAI - KELAS ${f.k}`, 14, 38);
+        
+       // Cetak Metadata Laporan (FUSI HORIZONTAL DINAMIS)
+        doc.setFontSize(10); doc.setFont(undefined, 'normal');
+        
+        // Pemotongan aman agar total satu baris tidak menabrak batas kanan kertas
+        let nmTugas = judul.length > 35 ? judul.substring(0, 32) + "..." : judul;
+        let nmGuru = info.guru.length > 25 ? info.guru.substring(0, 22) + "..." : info.guru;
+        
+        // Merangkai teks menjadi satu baris yang mengalir natural
+        const teksMetadata = `Tugas: ${nmTugas}   |   Guru: ${nmGuru}   |   Tanggal: ${formatTgl(info.tanggal)}`;
+        
+        // Tembakkan dari koordinat X:14, membiarkan teksnya mengalir ke kanan dengan sendirinya
+        doc.text(teksMetadata, 14, 45);
+        
+        // StartY dinaikkan menjadi 50 karena metadata sekarang hanya memakan 1 baris
+        doc.autoTable({ 
+            startY: 50, 
+            head: [['No', 'Nama Siswa', 'Nilai']], 
+            body: groups[judul].map((r, i) => [i + 1, r.nama_siswa, r.nilai]),
+            headStyles: { fillColor: [0, 123, 94] }
+        });
     });
-    doc.save(`Nilai_Mading_Kls${f.k}.pdf`); Swal.close();
+    
+    doc.save(`Nilai_Mading_Kls${f.k}.pdf`); 
+    Swal.close();
 }
 
+// ==========================================
+// MESIN CETAK CSV NILAI (ANTI-MOJIBAKE & REGIONAL INDO)
+// ==========================================
 async function eksporNilaiCSV(f) {
-    if(!f.k) return ui.errorGeneral("Pilih Kelas!"); Swal.fire({ title: 'Menyiapkan...', didOpen: () => Swal.showLoading()});
-    let q = sp.from('nilai_siswa').select('*'); if(f.k) q = q.eq('kelas', f.k); if(f.n) q = q.eq('nama_siswa', f.n); if(f.ket) q = q.eq('keterangan', f.ket); if(f.t1) q = q.gte('tanggal', f.t1); if(f.t2) q = q.lte('tanggal', f.t2);
-    if (activeUser && activeUser.role.toLowerCase() === 'guru') { q = q.eq('guru', activeUser.nama_lengkap || activeUser.username); }
-    const { data } = await q.order('kelas').order('nama_siswa').order('tanggal'); if(!data?.length) { Swal.close(); return ui.errorGeneral("Data kosong."); }
-    let csvData = "Tanggal,Kelas,Mapel,Guru,Siswa,Jenis,Tugas,Nilai\n";
-    data.forEach(r => csvData += `"${r.tanggal}","${r.kelas}","${r.mapel}","${r.guru}","${r.nama_siswa}","${r.jenis_nilai}","${r.keterangan}","${r.nilai}"\n`);
-    const link = document.createElement("a"); link.setAttribute("href", URL.createObjectURL(new Blob([csvData], { type: 'text/csv;charset=utf-8;' }))); link.setAttribute("download", `Nilai_Kls${f.k}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); Swal.close();
-}
+    if(!f.k) return ui.errorGeneral("Pilih Kelas!"); 
+    Swal.fire({ title: 'Menyiapkan Data CSV...', didOpen: () => Swal.showLoading()});
+    
+    let q = sp.from('nilai_siswa').select('*'); 
+    if(f.k) q = q.eq('kelas', f.k); 
+    if(f.n) q = q.eq('nama_siswa', f.n); 
+    if(f.ket) q = q.eq('keterangan', f.ket); 
+    if(f.t1) q = q.gte('tanggal', f.t1); 
+    if(f.t2) q = q.lte('tanggal', f.t2);
+    
+    if (activeUser && activeUser.role.toLowerCase() === 'guru') { 
+        q = q.eq('guru', activeUser.nama_lengkap || activeUser.username); 
+    }
 
+    const { data } = await q.order('kelas').order('nama_siswa').order('tanggal'); 
+    if(!data?.length) { Swal.close(); return ui.errorGeneral("Data kosong."); }
+    
+    // Merubah pemisah dari KOMA (,) menjadi TITIK KOMA (;)
+    let csvData = "Tanggal;Kelas;Mapel;Guru;Siswa;Jenis;Tugas;Nilai\n";
+    data.forEach(r => {
+        csvData += `"${r.tanggal}";"${r.kelas}";"${r.mapel}";"${r.guru}";"${r.nama_siswa}";"${r.jenis_nilai}";"${r.keterangan}";"${r.nilai}"\n`;
+    });
+    
+    // BOM (Byte Order Mark) memaksa Excel membaca UTF-8 dengan sempurna
+    const bom = "\uFEFF";
+    const blob = new Blob([bom + csvData], { type: 'text/csv;charset=utf-8;' });
+    
+    const link = document.createElement("a"); 
+    link.setAttribute("href", URL.createObjectURL(blob)); 
+    link.setAttribute("download", `Nilai_Kls${f.k}.csv`); 
+    document.body.appendChild(link); 
+    link.click(); 
+    document.body.removeChild(link); 
+    Swal.close();
+}
 // IMPORT CSV SISWA
 async function prosesUploadCSV() {
     const fileInput = document.getElementById('file-csv');
@@ -413,16 +646,349 @@ async function delSiswa(id) { ui.confirm("Hapus?","", async () => { await sp.fro
 async function editSiswa(id, n, k) { const { value: f } = await Swal.fire({ title: 'Edit', html: `<input id="e-n" class="swal2-input" value="${n}"><select id="e-k" class="swal2-input"><option value="7" ${k==='7'?'selected':''}>7</option><option value="8" ${k==='8'?'selected':''}>8</option><option value="9" ${k==='9'?'selected':''}>9</option></select>`, preConfirm: () => [document.getElementById('e-n').value, document.getElementById('e-k').value] }); if(f) { await sp.from('database_siswa').update({nama:f[0].toUpperCase(), kelas:f[1]}).eq('id',id); viewSiswa(); } }
 
 async function viewUser() {
-    const { data } = await sp.from('users').select('*').order('username'); const tb = document.getElementById('tb-user'); tb.innerHTML = "";
-    data?.forEach(u => tb.innerHTML += `<tr><td>${u.username}</td><td>${u.nama_lengkap || '-'}</td><td>${u.mapel || '-'}</td><td>${u.role}</td><td><button onclick="showUserModal('${u.username}','${u.username}','${u.password}','${u.mapel}','${u.role}','${u.nama_lengkap}')" style="background:var(--p); color:white; border:none; padding:5px 10px; border-radius:5px">Edit</button></td></tr>`);
+    const fRole = document.getElementById('f-role-user').value;
+    let q = sp.from('users').select('*').order('role').order('username');
+    if(fRole) q = q.eq('role', fRole); // Eksekusi Filter
+    
+    const { data } = await q; 
+    const tb = document.getElementById('tb-user'); tb.innerHTML = "";
+    
+    data?.forEach(u => {
+        // Tanda warna khusus untuk setiap role agar Admin tidak pusing
+        let badgeColor = u.role === 'admin' ? '#ef4444' : (u.role === 'guru' ? '#10b981' : '#3b82f6');
+        let roleBadge = `<span style="background:${badgeColor}; color:white; font-size:0.75rem; padding:4px 8px; border-radius:6px; text-transform:uppercase; font-weight:bold; letter-spacing:1px;">${u.role}</span>`;
+        
+        tb.innerHTML += `<tr>
+            <td><strong>${u.username}</strong></td>
+            <td>${u.nama_lengkap || '-'}</td>
+            <td><small>${u.mapel || '-'}</small></td>
+            <td>${roleBadge}</td>
+            <td><button onclick="showUserModal('${u.username}','${u.username}','${u.password || ''}','${u.mapel || ''}','${u.role}','${u.nama_lengkap || ''}')" style="background:var(--p); color:white; border:none; padding:6px 12px; border-radius:8px; font-weight:bold; cursor:pointer;">Edit</button></td>
+        </tr>`;
+    });
 }
+
 async function showUserModal(old_u='', u='', p='', m='', r='guru', nl='') {
     const isEdit = old_u !== ''; 
-    const { value: f } = await Swal.fire({ title: isEdit ? 'Edit User' : 'Tambah', html: `<input id="u-nl" class="swal2-input" placeholder="Nama Lengkap" value="${nl}"><input id="u-u" class="swal2-input" placeholder="Username" value="${u}"><input id="u-p" type="password" class="swal2-input" placeholder="Password" value="${p}"><input id="u-m" class="swal2-input" placeholder="Mapel" value="${m}"><select id="u-r" class="swal2-input"><option value="guru" ${r==='guru'?'selected':''}>Guru</option><option value="admin" ${r==='admin'?'selected':''}>Admin</option></select>`, preConfirm: () => ({ nama_lengkap: document.getElementById('u-nl').value, username: document.getElementById('u-u').value.toLowerCase(), password: document.getElementById('u-p').value, mapel: document.getElementById('u-m').value, role: document.getElementById('u-r').value }) });
+    const { value: f } = await Swal.fire({ 
+        title: isEdit ? 'Edit Pengguna' : 'Tambah Pengguna', 
+        html: `
+            <input id="u-nl" class="swal2-input" placeholder="Nama Lengkap" value="${nl}">
+            <input id="u-u" class="swal2-input" placeholder="Username (Tanpa Spasi)" value="${u}">
+            <input id="u-p" type="password" class="swal2-input" placeholder="Password Baru" value="">
+            <small style="display:block; text-align:left; margin-bottom:10px; color:#64748b;">*Isi kolom di bawah dengan Mapel (untuk Guru) atau Kelas (untuk Siswa)</small>
+            <input id="u-m" class="swal2-input" placeholder="Mapel / Kelas" value="${m}">
+            <select id="u-r" class="swal2-input">
+                <option value="guru" ${r==='guru'?'selected':''}>Guru</option>
+                <option value="admin" ${r==='admin'?'selected':''}>Admin</option>
+                <option value="siswa" ${r==='siswa'?'selected':''}>Siswa</option>
+            </select>`, 
+        preConfirm: () => ({ 
+            nama_lengkap: document.getElementById('u-nl').value, 
+            username: document.getElementById('u-u').value.toLowerCase().replace(/\s+/g, ''), 
+            password: document.getElementById('u-p').value, 
+            mapel: document.getElementById('u-m').value, 
+            role: document.getElementById('u-r').value 
+        }) 
+    });
+    
     if(f) { 
+        if(!isEdit && !f.password) return ui.errorGeneral("Password wajib diisi untuk pengguna baru!");
+        
         Swal.fire({ title: 'Menyimpan...', didOpen: () => Swal.showLoading()});
-        if (!isEdit) { await sp.auth.signUp({ email: `${f.username}@spetaga.com`, password: f.password }); await sp.from('users').insert([f]); } 
-        else { await sp.from('users').update(f).eq('username', old_u); }
-        Swal.close(); ui.success("Tersimpan!"); viewUser(); 
+        try {
+            if (!isEdit) { 
+                const { error: errAuth } = await sp.auth.signUp({ email: `${f.username}@spetaga.com`, password: f.password }); 
+                if(errAuth) throw errAuth;
+                
+                // INJEKSI PERBAIKAN: Menambahkan f.password agar database tidak menolak
+                const { error: errDb } = await sp.from('users').insert([{
+                    username: f.username, nama_lengkap: f.nama_lengkap, mapel: f.mapel, role: f.role, password: f.password
+                }]);
+                if(errDb) throw errDb;
+            } 
+            else { 
+                let updateData = { nama_lengkap: f.nama_lengkap, mapel: f.mapel, role: f.role };
+                // INJEKSI PERBAIKAN: Jika password diisi saat edit, update juga di database public
+                if(f.password) {
+                    updateData.password = f.password; 
+                }
+                const { error: errUpdate } = await sp.from('users').update(updateData).eq('username', old_u);
+                if(errUpdate) throw errUpdate;
+            }
+            
+            Swal.close(); ui.success("Tersimpan!"); viewUser(); 
+        } catch (error) {
+            Swal.close(); ui.errorGeneral(error.message);
+        }
+    }
+}
+
+// ==========================================
+// 8. MESIN PORTAL SISWA
+// ==========================================
+
+// ==========================================
+// MESIN RAPOR SISWA (SISTEM FILTER TERPISAH)
+// ==========================================
+
+async function loadRaporSiswa() {
+    if (!activeUser || activeUser.role !== 'siswa') return;
+    
+    // 1. Injeksi Tanggal Hari Ini ke Filter Absensi
+    const hariIni = new Date().toLocaleDateString('en-CA');
+    document.getElementById('f-siswa-abs-t1').value = hariIni;
+    document.getElementById('f-siswa-abs-t2').value = hariIni;
+    
+    // Auto-load HANYA absensi hari ini
+    loadSiswaAbsenFiltered();
+
+    // 2. Siapkan Dropdown Guru untuk Nilai
+    const selGuru = document.getElementById('f-siswa-nilai-guru');
+    selGuru.innerHTML = '<option value="">-- Memuat Daftar Guru... --</option>';
+    document.getElementById('tb-siswa-nilai').innerHTML = '<tr><td colspan="5" style="text-align:center;">Silakan pilih guru terlebih dahulu.</td></tr>';
+
+    try {
+        // Tarik rekam jejak guru yang PERNAH memberi nilai ke siswa ini
+        const { data } = await sp.from('nilai_siswa').select('guru').eq('nama_siswa', activeUser.nama_lengkap);
+        
+        selGuru.innerHTML = '<option value="">-- Pilih Guru Pengajar --</option>';
+        if (data && data.length > 0) {
+            // Menggunakan Set untuk membuang nama duplikat secara instan di memori browser
+            const guruUnik = [...new Set(data.map(item => item.guru))].sort();
+            guruUnik.forEach(g => {
+                if(g) selGuru.innerHTML += `<option value="${g}">${g}</option>`;
+            });
+        } else {
+            selGuru.innerHTML = '<option value="">-- Belum ada guru yang memberi nilai --</option>';
+        }
+    } catch(e) {
+        console.error("Gagal memuat daftar guru:", e);
+    }
+}
+
+async function loadSiswaAbsenFiltered() {
+    const t1 = document.getElementById('f-siswa-abs-t1').value;
+    const t2 = document.getElementById('f-siswa-abs-t2').value;
+    const tb = document.getElementById('tb-siswa-absen');
+    
+    if (!t1 || !t2) return ui.errorGeneral("Pilih rentang tanggal terlebih dahulu!");
+    
+    tb.innerHTML = '<tr><td colspan="4" style="text-align:center;">Mencari riwayat kehadiran...</td></tr>';
+    
+    const { data } = await sp.from('absensi').select('*')
+        .eq('nama', activeUser.nama_lengkap)
+        .gte('tanggal', t1).lte('tanggal', t2)
+        .order('tanggal', {ascending: false});
+        
+    tb.innerHTML = '';
+    if (!data || data.length === 0) {
+        tb.innerHTML = '<tr><td colspan="4" style="text-align:center;">Tidak ada catatan absensi pada rentang tanggal tersebut.</td></tr>';
+    } else {
+        data.forEach(r => {
+            let warna = r.status === 'Hadir' ? '#10b981' : (r.status === 'Izin' ? '#f59e0b' : (r.status === 'Sakit' ? '#3b82f6' : '#ef4444'));
+            tb.innerHTML += `<tr><td>${formatTgl(r.tanggal)}</td><td>${r.mapel}</td><td><b style="color:${warna}">${r.status}</b></td><td>${r.guru}</td></tr>`;
+        });
+    }
+}
+
+async function loadSiswaNilaiFiltered() {
+    const guru = document.getElementById('f-siswa-nilai-guru').value;
+    const tb = document.getElementById('tb-siswa-nilai');
+    
+    if (!guru) return ui.errorGeneral("Pilih nama guru pengajar terlebih dahulu!");
+    
+    tb.innerHTML = '<tr><td colspan="5" style="text-align:center;">Menarik catatan nilai...</td></tr>';
+    
+    const { data } = await sp.from('nilai_siswa').select('*')
+        .eq('nama_siswa', activeUser.nama_lengkap)
+        .eq('guru', guru)
+        .order('tanggal', {ascending: false});
+        
+    tb.innerHTML = '';
+    if (!data || data.length === 0) {
+        tb.innerHTML = '<tr><td colspan="5" style="text-align:center;">Belum ada nilai dari guru tersebut.</td></tr>';
+    } else {
+        data.forEach(r => {
+            tb.innerHTML += `<tr><td>${formatTgl(r.tanggal)}</td><td>${r.mapel}</td><td>${r.keterangan}</td><td><b>${r.nilai}</b></td><td>${r.guru}</td></tr>`;
+        });
+    }
+}
+
+// ==========================================
+// MESIN PENGIRIM & PENERIMA TUGAS
+// ==========================================
+
+async function initHalamanTugasSiswa() {
+    const selUpload = document.getElementById('in-siswa-tugas-guru');
+    const selFilter = document.getElementById('f-siswa-riwayat-guru');
+    
+    // Tarik daftar guru dari tabel users
+    const { data } = await sp.from('users').select('nama_lengkap, username').eq('role', 'guru').order('nama_lengkap');
+    
+    selUpload.innerHTML = '<option value="">-- Pilih Guru Tujuan --</option>';
+    selFilter.innerHTML = '<option value="">Semua Guru</option>';
+    
+    data?.forEach(g => {
+        const namaGuru = g.nama_lengkap || g.username;
+        selUpload.innerHTML += `<option value="${namaGuru}">${namaGuru}</option>`;
+        selFilter.innerHTML += `<option value="${namaGuru}">${namaGuru}</option>`;
+    });
+    
+    loadRiwayatTugasSiswa();
+}
+
+async function uploadTugasSiswa() {
+    if (!activeUser || activeUser.role !== 'siswa') return;
+    const inGuru = document.getElementById('in-siswa-tugas-guru').value;
+    const inNamaTugas = document.getElementById('in-siswa-namatugas').value.trim();
+    const inFile = document.getElementById('in-siswa-file').files[0];
+
+    if (!inGuru) return ui.errorGeneral("Pilih Guru Tujuan terlebih dahulu!");
+    if (!inNamaTugas) return ui.errorGeneral("Nama Tugas tidak boleh kosong!");
+    if (!inFile) return ui.errorGeneral("Pilih file tugas terlebih dahulu!");
+    if (inFile.size > 5 * 1024 * 1024) return ui.errorGeneral("Ukuran file melebihi batas 5 MB!");
+
+    Swal.fire({ title: 'Mengunggah Tugas...', text: 'Mohon tunggu, jangan tutup halaman ini.', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+
+    try {
+        const fileExt = inFile.name.split('.').pop();
+        const safeName = activeUser.nama_lengkap.replace(/[^a-zA-Z0-9]/g, '_');
+        const fileName = `${Date.now()}_${safeName}.${fileExt}`;
+
+        const { error: uploadError } = await sp.storage.from('tugas_siswa').upload(fileName, inFile);
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = sp.storage.from('tugas_siswa').getPublicUrl(fileName);
+        const fileUrl = publicUrlData.publicUrl;
+
+        const tglSekarang = new Date().toLocaleDateString('en-CA');
+        const { error: dbError } = await sp.from('tugas_terkumpul').insert([{
+            tanggal: tglSekarang,
+            nama_siswa: activeUser.nama_lengkap,
+            kelas: activeUser.mapel, // Disisipkan saat admin buat akun
+            nama_tugas: inNamaTugas,
+            file_url: fileUrl,
+            guru: inGuru // Menembak tepat ke sasaran (kolom baru)
+        }]);
+        if (dbError) throw dbError;
+
+        Swal.close(); ui.success("Tugas berhasil diunggah!");
+        
+        document.getElementById('in-siswa-namatugas').value = ''; document.getElementById('in-siswa-file').value = '';
+        loadRiwayatTugasSiswa();
+
+    } catch (err) {
+        console.error("Gagal Upload:", err); Swal.close(); ui.errorGeneral("Gagal mengunggah: " + err.message);
+    }
+}
+
+async function loadRiwayatTugasSiswa() {
+    if (!activeUser || activeUser.role !== 'siswa') return;
+    const tb = document.getElementById('tb-siswa-riwayat-tugas');
+    const fGuru = document.getElementById('f-siswa-riwayat-guru').value;
+    
+    tb.innerHTML = '<tr><td colspan="3" style="text-align:center;">Memuat riwayat tugas...</td></tr>';
+
+    let q = sp.from('tugas_terkumpul').select('*').eq('nama_siswa', activeUser.nama_lengkap).order('created_at', {ascending: false});
+    if (fGuru) q = q.eq('guru', fGuru); // Eksekusi filter guru
+
+    const { data, error } = await q;
+
+    tb.innerHTML = '';
+    if (error || !data || data.length === 0) {
+        tb.innerHTML = '<tr><td colspan="3" style="text-align:center;">Belum ada tugas yang dikumpulkan.</td></tr>';
+        return;
+    }
+
+    data.forEach(r => {
+        tb.innerHTML += `<tr>
+            <td>${formatTgl(r.tanggal)}<br><small style="color:var(--side)">Kepada: <b>${r.guru}</b></small></td>
+            <td><strong>${r.nama_tugas}</strong></td>
+            <td><a href="${r.file_url}" target="_blank" style="display:inline-block; background:var(--p); color:white; padding:6px 12px; text-decoration:none; border-radius:6px; font-weight:bold; font-size:0.85rem;">📥 Lihat File</a></td>
+        </tr>`;
+    });
+}
+
+async function loadTugasMasukGuru() {
+    if (!activeUser || activeUser.role !== 'guru') return;
+    const kls = document.getElementById('f-guru-tugas-kls').value;
+    const tgl = document.getElementById('f-guru-tugas-tgl').value;
+    const tb = document.getElementById('tb-guru-tugas-masuk');
+    
+    tb.innerHTML = '<tr><td colspan="4" style="text-align:center;">Memeriksa laci tugas...</td></tr>';
+    
+    // Guru hanya bisa melihat tugas yang ditembakkan ke namanya
+    let q = sp.from('tugas_terkumpul').select('*')
+        .eq('guru', activeUser.nama_lengkap || activeUser.username)
+        .order('created_at', {ascending: false});
+        
+    if(kls) q = q.eq('kelas', kls);
+    if(tgl) q = q.eq('tanggal', tgl);
+    
+    const { data, error } = await q.limit(100);
+    
+    tb.innerHTML = '';
+    if (error || !data || data.length === 0) {
+        tb.innerHTML = '<tr><td colspan="4" style="text-align:center;">Belum ada tugas yang masuk dari kriteria tersebut.</td></tr>';
+        return;
+    }
+
+    data.forEach(r => {
+        // PERUBAHAN PRESISI: Menambahkan ?download= pada file_url dan mengubah teks/ikon tombol
+        tb.innerHTML += `<tr>
+            <td>${formatTgl(r.tanggal)}</td>
+            <td><strong>${r.nama_siswa}</strong><br><small>Kelas: ${r.kelas}</small></td>
+            <td>${r.nama_tugas}</td>
+            <td><a href="${r.file_url}?download=" style="display:inline-block; background:#f59e0b; color:white; padding:6px 12px; text-decoration:none; border-radius:6px; font-weight:bold; font-size:0.85rem;">⬇️ Unduh File</a></td>
+        </tr>`;
+    });
+}
+
+// ==========================================
+// MESIN UBAH PASSWORD PRIBADI (SISWA/GURU)
+// ==========================================
+async function ubahPasswordPribadi() {
+    if (!activeUser) return;
+    
+    const { value: passBaru } = await Swal.fire({
+        title: 'Ubah Password',
+        // INJEKSI UI: Merebut kendali dari default SweetAlert
+        html: `
+            <label style="display:block; text-align:left; font-weight:bold; margin-bottom:8px; font-size:14px;">Masukkan Password Baru</label>
+            <input type="password" id="swal-in-pass" class="swal2-input" placeholder="Minimal 6 karakter" style="width: 100%; margin: 0; box-sizing: border-box;">
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Simpan',
+        cancelButtonText: 'Batal',
+        preConfirm: () => {
+            const val = document.getElementById('swal-in-pass').value;
+            if (!val || val.length < 6) {
+                Swal.showValidationMessage('Password wajib diisi minimal 6 karakter!');
+                return false;
+            }
+            return val;
+        }
+    });
+
+    if (passBaru) {
+        Swal.fire({ title: 'Menyimpan Password...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+        
+        try {
+            // 1. Tembus ke Brankas Auth Supabase
+            const { error: errAuth } = await sp.auth.updateUser({ password: passBaru });
+            if (errAuth) throw errAuth;
+
+            // 2. Tembus ke Etalase Tabel public.users (Agar admin tidak bingung)
+            const { error: errDb } = await sp.from('users').update({ password: passBaru }).eq('username', activeUser.username);
+            if (errDb) throw errDb;
+
+            Swal.close();
+            ui.success("Password berhasil diperbarui!");
+        } catch (error) {
+            Swal.close();
+            console.error("Gagal ubah password:", error);
+            ui.errorGeneral("Gagal mengubah password: " + error.message);
+        }
     }
 }
