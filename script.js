@@ -79,6 +79,9 @@ async function cekSesiAktif() {
                 // Set Profil Sidebar
                 const elNama = document.getElementById('profil-nama');
                 const elRole = document.getElementById('profil-role');
+                // Set Profil Mobile Header
+                const mhNama = document.getElementById('mh-nama');
+                if(mhNama) mhNama.innerText = namaTampil;
                 if(sideProfile && elNama && elRole) {
                     elNama.innerText = namaTampil;
                     elRole.innerText = r;
