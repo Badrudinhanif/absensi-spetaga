@@ -15,7 +15,7 @@
 <div id="global-loader">
     <div class="loader-content">
         <div class="spinner"></div>
-        <p style="font-weight: bold; letter-spacing: 1px;">MEMUAT APLIKASI...</p>
+        <p style="font-weight: bold; letter-spacing: 1px;">MEMUAT SPETAGA...</p>
     </div>
 </div>
 
@@ -26,7 +26,10 @@
         <div id="login-error" style="display:none"></div>
         <div class="input-group">
             <input type="text" id="user-in" placeholder="Username" autocomplete="off">
-            <input type="password" id="pass-in" placeholder="Password">
+            <div style="position: relative; width: 100%;">
+                <input type="password" id="pass-in" placeholder="Password" style="padding-right: 45px;">
+                <span id="toggle-icon" onclick="togglePass()" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 1.2rem; opacity: 0.6; user-select: none;"></span>
+            </div>
         </div>
         <button class="btn-login" onclick="doLogin()">MASUK</button>
     </div>
@@ -44,7 +47,7 @@
             <div class="nav-link guru-only" id="n-nilai" onclick="openPage('nilai')">💯<span>Nilai</span></div>
             <div class="nav-link admin-only" id="n-siswa" onclick="openPage('siswa')">👥<span>Siswa</span></div>
             <div class="nav-link admin-only" id="n-user" onclick="openPage('user')">🔐<span>User</span></div>
-            <div class="nav-link admin-only" onclick="showCetakModal()">🖨️<span>Ekspor Data</span></div>
+            <div class="nav-link" onclick="showCetakModal()">🖨️<span>Ekspor Data</span></div>
             <div class="nav-link btn-logout" style="color:#ef4444; opacity:1">🚪<span>Keluar</span></div>
         </nav>
     </div>
@@ -54,6 +57,8 @@
     </div>
 
     <div class="main-content">
+        <div id="top-user-info" class="top-user-info" style="display:none;"></div>
+
         <div id="pg-dash" class="page">
             <h2 style="margin-top:0">Monitor Absensi</h2>
             <div class="card desktop-grid">
@@ -115,7 +120,7 @@
                     <table>
                         <thead><tr><th>Tugas / Ujian</th><th>Siswa & Kelas</th><th>Nilai</th><th>Aksi</th></tr></thead>
                         <tbody id="tb-riwayat-nilai">
-                            <tr><td colspan="4" style="text-align:center; padding: 30px; color: #64748b;">Silakan atur filter di atas lalu klik <b>CARI</b> untuk menampilkan riwayat.</td></tr>
+                            <tr><td colspan="4" style="text-align:center; padding: 30px; color: #64748b;">Silakan atur filter di atas lalu klik <b>CARI</b>.</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -124,7 +129,8 @@
 
         <div id="pg-siswa" class="page admin-only">
             <h2 style="margin-top:0">Master Data Siswa</h2>
-            <div class="card desktop-flex">
+            
+			<div class="card desktop-flex">
                 <input type="text" id="in-nama-s" placeholder="Nama Siswa Baru" style="flex:2">
                 <select id="in-kls-s" style="flex:1"><option value="7">Kelas 7</option><option value="8">Kelas 8</option><option value="9">Kelas 9</option></select>
                 <button onclick="addSiswa()" class="btn-save">TAMBAH</button>

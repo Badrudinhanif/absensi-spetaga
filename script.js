@@ -301,8 +301,18 @@ window.toggleFilterTugas = function() { const wrap = document.getElementById('wr
 async function updateModalFilter() {
     const kls = document.getElementById('p-kls').value; const selNama = document.getElementById('p-nama'); const selKet = document.getElementById('p-ket');
     if (!selNama || !selKet) return; selNama.innerHTML = '<option value="">Semua Siswa</option>'; selKet.innerHTML = '<option value="">Semua Tugas</option>'; if(!kls) return;
-    const { data: sData } = await sp.from('database_siswa').select('nama').eq('kelas', kls).order('nama'); sData?.forEach(s => selNama.innerHTML += `<option value="${s.nama}">${s.nama}</option>`);
-    const { data: tData } = await sp.from('nilai_siswa').select('keterangan').eq('kelas', kls); if(tData) [...new Set(tData.map(i => i.keterangan))].forEach(t => selKet.innerHTML += `<option value="${t}">${t}</option>`);
+    
+    const { data: sData } = await sp.from('database_siswa').select('nama').eq('kelas', kls).order('nama'); 
+    sData?.forEach(s => selNama.innerHTML += `<option value="${s.nama}">${s.nama}</option>`);
+    
+    let q = sp.from('nilai_siswa').select('keterangan').eq('kelas', kls);
+    // KUNCI ISOLASI DATA (TUGAS)
+    if (activeUser && activeUser.role.toLowerCase() === 'guru') {
+        q = q.eq('guru', activeUser.nama_lengkap || activeUser.username);
+    }
+    
+    const { data: tData } = await q; 
+    if(tData) [...new Set(tData.map(i => i.keterangan))].forEach(t => selKet.innerHTML += `<option value="${t}">${t}</option>`);
 }
 
 async function showCetakModal() {
@@ -319,6 +329,8 @@ async function eksporAbsensiPDF(f) {
     let q = sp.from('absensi').select('*');
     if(f.k) q = q.eq('kelas', f.k); if(f.n) q = q.eq('nama', f.n); if(f.t1) q = q.gte('tanggal', f.t1); if(f.t2) q = q.lte('tanggal', f.t2);
     
+    
+
     const { data } = await q.order('tanggal', {ascending:true}).order('nama', {ascending:true});
     if(!data?.length) { Swal.close(); return ui.errorGeneral("Data kosong pada filter tersebut."); }
 

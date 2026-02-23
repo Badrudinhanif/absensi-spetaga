@@ -13,9 +13,7 @@
 
 body { 
     font-family: 'Inter', 'Segoe UI', sans-serif; 
-    margin: 0; 
-    background: var(--bg); 
-    color: var(--text); 
+    margin: 0; background: var(--bg); color: var(--text); 
 }
 
 .page { display: none !important; }
@@ -32,9 +30,9 @@ body {
 }
 .loader-content { text-align: center; }
 .spinner {
-    width: 45px; height: 45px;
-    border: 5px solid rgba(255,255,255,0.2); border-top: 5px solid #10b981;
-    border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 15px auto;
+    width: 45px; height: 45px; border: 5px solid rgba(255,255,255,0.2); 
+    border-top: 5px solid #10b981; border-radius: 50%; 
+    animation: spin 1s linear infinite; margin: 0 auto 15px auto;
 }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
@@ -100,6 +98,15 @@ nav { display: flex; flex-direction: column; margin-top: 20px; gap: 8px; }
 .nav-link.active { opacity: 1; background: rgba(0,123,94,0.15); color: #10b981; border-right: 4px solid var(--p); }
 
 .main-content { margin-left: 260px; padding: 40px; box-sizing: border-box; }
+
+/* INDIKATOR IDENTITAS USER */
+.top-user-info {
+    background: linear-gradient(135deg, var(--p), #005f46); color: white;
+    padding: 12px 20px; border-radius: 12px; margin-bottom: 25px;
+    display: flex; justify-content: space-between; align-items: center; font-weight: 700;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid rgba(255,255,255,0.1);
+}
+
 .card { background: white; padding: 25px; border-radius: 20px; border: 1px solid #e2e8f0; margin-bottom: 25px; }
 .card.no-padding { padding: 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .desktop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
