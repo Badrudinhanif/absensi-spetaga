@@ -48,7 +48,21 @@
             <div class="nav-link admin-only" id="n-siswa" onclick="openPage('siswa')">👥<span>Siswa</span></div>
             <div class="nav-link admin-only" id="n-user" onclick="openPage('user')">🔐<span>User</span></div>
             <div class="nav-link" onclick="showCetakModal()">🖨️<span>Ekspor Data</span></div>
-            <div class="nav-link btn-logout" style="color:#ef4444; opacity:1">🚪<span>Keluar</span></div>
+            
+            <div class="nav-link btn-logout mobile-only" style="color:#ef4444;">🚪<span>Keluar</span></div>
+
+            <div id="sidebar-profile" class="desktop-only" style="display:none;">
+                <div class="profile-info">
+                    <div class="profile-avatar">👤</div>
+                    <div style="overflow: hidden;">
+                        <div id="profil-nama" class="profile-name">Nama</div>
+                        <div id="profil-role" class="profile-role">Role</div>
+                    </div>
+                </div>
+                <button class="btn-logout sidebar-btn-logout">
+                    🚪 <span>Keluar</span>
+                </button>
+            </div>
         </nav>
     </div>
 
@@ -57,8 +71,6 @@
     </div>
 
     <div class="main-content">
-        <div id="top-user-info" class="top-user-info" style="display:none;"></div>
-
         <div id="pg-dash" class="page">
             <h2 style="margin-top:0">Monitor Absensi</h2>
             <div class="card desktop-grid">
@@ -130,7 +142,16 @@
         <div id="pg-siswa" class="page admin-only">
             <h2 style="margin-top:0">Master Data Siswa</h2>
             
-			<div class="card desktop-flex">
+            <div class="card desktop-flex" style="background: #f0fdf4; border-color: #10b981; margin-bottom: 15px;">
+                <div style="flex:1">
+                    <strong style="color: #004d3b; display:block; margin-bottom:5px;">Import Massal via CSV</strong>
+                    <small style="color: #64748b;">Format: Baris pertama Header (Nama, Kelas). Simpan dari Excel sebagai CSV (Comma delimited).</small>
+                </div>
+                <input type="file" id="file-csv" accept=".csv" style="display:none" onchange="prosesUploadCSV()">
+                <button onclick="document.getElementById('file-csv').click()" class="btn-save" style="background: #10b981; padding: 12px 20px;">+ UPLOAD CSV</button>
+            </div>
+
+            <div class="card desktop-flex">
                 <input type="text" id="in-nama-s" placeholder="Nama Siswa Baru" style="flex:2">
                 <select id="in-kls-s" style="flex:1"><option value="7">Kelas 7</option><option value="8">Kelas 8</option><option value="9">Kelas 9</option></select>
                 <button onclick="addSiswa()" class="btn-save">TAMBAH</button>
