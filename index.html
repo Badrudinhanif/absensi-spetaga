@@ -9,6 +9,23 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        /* INJEKSI: Memaksa tabel agar bisa di-scroll horizontal di layar HP */
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch; /* Efek scroll mulus di iOS/iPhone */
+            border-radius: 8px;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.05); /* Memberi ilusi ada ruang di dalam */
+        }
+        .table-responsive table {
+            min-width: 600px; /* Paksa tabel menjaga wujud aslinya, jangan biarkan mengkerut */
+            width: 100%;
+        }
+        .table-responsive th {
+            white-space: nowrap; /* Mencegah teks header bertumpuk ke bawah */
+        }
+    </style>
 </head>
 <body>
 
@@ -27,8 +44,8 @@
         <div class="input-group">
             <input type="text" id="user-in" placeholder="Username" autocomplete="off">
             <div style="position: relative; width: 100%;">
-                <input type="password" id="pass-in" placeholder="Password" style="padding-right: 45px;">
-                <span id="toggle-icon" onclick="togglePass()" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 1.2rem; opacity: 0.6; user-select: none;"></span>
+                <input type="password" id="pass-in" placeholder="Password" style="width: 100%; box-sizing: border-box; padding-right: 65px;">
+                <span id="toggle-icon" onclick="togglePass()" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 0.85rem; font-weight: bold; color: var(--p); user-select: none;">[Lihat]</span>
             </div>
         </div>
         <button class="btn-login" onclick="doLogin()">MASUK</button>
@@ -187,7 +204,7 @@
                 <button onclick="showUserModal()" class="btn-save" style="flex:1">+ TAMBAH USER</button>
             </div>
             <div class="card no-padding">
-                <table><thead><tr><th>Username</th><th>Nama</th><th>Detail</th><th>Role</th><th>Aksi</th></tr></thead><tbody id="tb-user"></tbody></table>
+                <table><thead><tr><th>Username</th><th>Nama</th><th>Detail</th><th>Role</th><th>Login Terakhir</th><th>Aksi</th></tr></thead><tbody id="tb-user"></tbody></table>
             </div>
         </div>
 
@@ -250,7 +267,7 @@
                 <div style="margin-bottom:20px;">
                     <label style="font-weight:bold; display:block; margin-bottom:5px;">File Tugas (PDF / Word)</label>
                     <input type="file" id="in-siswa-file" accept=".pdf,.doc,.docx" style="width:100%; padding:10px; border:2px dashed #cbd5e1; border-radius:8px; background:#f8fafc;">
-                    <small style="color:red; display:block; margin-top:5px;">*Maksimal ukuran file: 5 MB.</small>
+                    <small style="color:red; display:block; margin-top:5px;">*Maksimal ukuran file: 20 MB.</small>
                 </div>
                 <button onclick="uploadTugasSiswa()" class="btn-save" style="width:100%;"><i class="fas fa-upload"></i> 📤 Unggah Tugas Sekarang</button>
             </div>

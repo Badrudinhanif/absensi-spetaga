@@ -7,7 +7,7 @@ const sp = supabase.createClient(URL_DB, KEY_DB);
 
 let activeUser = null;
 let idleTimer;
-const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 
 const ui = {
     btnLoading: (status, originalText) => { const btn = document.querySelector('.btn-login'); if (btn) { btn.disabled = status; btn.innerText = status ? "Memverifikasi..." : originalText; }},
@@ -148,6 +148,11 @@ async function doLogin() {
         ui.btnLoading(false, "MASUK");
         const loader = document.getElementById('global-loader');
         if(loader) { loader.style.display = 'flex'; loader.style.opacity = '1'; }
+        // INJEKSI: Perekam Waktu Login
+        const usernameInput = document.getElementById('user-in').value.toLowerCase().replace(/\s+/g, '');
+        await sp.from('users').update({ terakhir_login: new Date().toISOString() }).eq('username', usernameInput);
+        
+        cekSesiAktif(); // (Ini adalah baris lamamu, biarkan saja)
         cekSesiAktif(); 
     } catch(e) { ui.btnLoading(false, "MASUK"); showLoginError("Gagal Login. Periksa kredensial."); }
 }
@@ -645,24 +650,36 @@ async function addSiswa() { const n = document.getElementById('in-nama-s').value
 async function delSiswa(id) { ui.confirm("Hapus?","", async () => { await sp.from('database_siswa').delete().eq('id',id); viewSiswa(); }); }
 async function editSiswa(id, n, k) { const { value: f } = await Swal.fire({ title: 'Edit', html: `<input id="e-n" class="swal2-input" value="${n}"><select id="e-k" class="swal2-input"><option value="7" ${k==='7'?'selected':''}>7</option><option value="8" ${k==='8'?'selected':''}>8</option><option value="9" ${k==='9'?'selected':''}>9</option></select>`, preConfirm: () => [document.getElementById('e-n').value, document.getElementById('e-k').value] }); if(f) { await sp.from('database_siswa').update({nama:f[0].toUpperCase(), kelas:f[1]}).eq('id',id); viewSiswa(); } }
 
+// ==========================================
+// MESIN FORMAT WAKTU LOGIN
+// ==========================================
+function formatTglWaktu(isoString) {
+    if(!isoString) return '-';
+    const d = new Date(isoString);
+    return d.toLocaleString('id-ID', {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'});
+}
+
 async function viewUser() {
     const fRole = document.getElementById('f-role-user').value;
     let q = sp.from('users').select('*').order('role').order('username');
-    if(fRole) q = q.eq('role', fRole); // Eksekusi Filter
+    if(fRole) q = q.eq('role', fRole);
     
     const { data } = await q; 
     const tb = document.getElementById('tb-user'); tb.innerHTML = "";
     
     data?.forEach(u => {
-        // Tanda warna khusus untuk setiap role agar Admin tidak pusing
         let badgeColor = u.role === 'admin' ? '#ef4444' : (u.role === 'guru' ? '#10b981' : '#3b82f6');
         let roleBadge = `<span style="background:${badgeColor}; color:white; font-size:0.75rem; padding:4px 8px; border-radius:6px; text-transform:uppercase; font-weight:bold; letter-spacing:1px;">${u.role}</span>`;
         
+        // Logika status login
+        let lastLogin = u.terakhir_login ? formatTglWaktu(u.terakhir_login) : '<span style="color:#cbd5e1; font-style:italic;">Belum pernah</span>';
+
         tb.innerHTML += `<tr>
             <td><strong>${u.username}</strong></td>
             <td>${u.nama_lengkap || '-'}</td>
             <td><small>${u.mapel || '-'}</small></td>
             <td>${roleBadge}</td>
+            <td><small>${lastLogin}</small></td>
             <td><button onclick="showUserModal('${u.username}','${u.username}','${u.password || ''}','${u.mapel || ''}','${u.role}','${u.nama_lengkap || ''}')" style="background:var(--p); color:white; border:none; padding:6px 12px; border-radius:8px; font-weight:bold; cursor:pointer;">Edit</button></td>
         </tr>`;
     });
@@ -847,7 +864,7 @@ async function uploadTugasSiswa() {
     if (!inGuru) return ui.errorGeneral("Pilih Guru Tujuan terlebih dahulu!");
     if (!inNamaTugas) return ui.errorGeneral("Nama Tugas tidak boleh kosong!");
     if (!inFile) return ui.errorGeneral("Pilih file tugas terlebih dahulu!");
-    if (inFile.size > 5 * 1024 * 1024) return ui.errorGeneral("Ukuran file melebihi batas 5 MB!");
+    if (inFile.size > 20 * 1024 * 1024) return ui.errorGeneral("Ukuran file melebihi batas 20 MB!");
 
     Swal.fire({ title: 'Mengunggah Tugas...', text: 'Mohon tunggu, jangan tutup halaman ini.', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
 
@@ -905,7 +922,7 @@ async function loadRiwayatTugasSiswa() {
         tb.innerHTML += `<tr>
             <td>${formatTgl(r.tanggal)}<br><small style="color:var(--side)">Kepada: <b>${r.guru}</b></small></td>
             <td><strong>${r.nama_tugas}</strong></td>
-            <td><a href="${r.file_url}" target="_blank" style="display:inline-block; background:var(--p); color:white; padding:6px 12px; text-decoration:none; border-radius:6px; font-weight:bold; font-size:0.85rem;">📥 Lihat File</a></td>
+            <td><button onclick="prosesBukaFile('${r.file_url}', false)" style="background:var(--p); color:white; padding:6px 12px; border:none; border-radius:6px; font-weight:bold; font-size:0.85rem; cursor:pointer;">📥 Lihat File</button></td>
         </tr>`;
     });
 }
@@ -940,7 +957,7 @@ async function loadTugasMasukGuru() {
             <td>${formatTgl(r.tanggal)}</td>
             <td><strong>${r.nama_siswa}</strong><br><small>Kelas: ${r.kelas}</small></td>
             <td>${r.nama_tugas}</td>
-            <td><a href="${r.file_url}?download=" style="display:inline-block; background:#f59e0b; color:white; padding:6px 12px; text-decoration:none; border-radius:6px; font-weight:bold; font-size:0.85rem;">⬇️ Unduh File</a></td>
+            <td><button onclick="prosesBukaFile('${r.file_url}', true)" style="background:#f59e0b; color:white; padding:6px 12px; border:none; border-radius:6px; font-weight:bold; font-size:0.85rem; cursor:pointer;">⬇️ Unduh File</button></td>
         </tr>`;
     });
 }
@@ -956,7 +973,10 @@ async function ubahPasswordPribadi() {
         // INJEKSI UI: Merebut kendali dari default SweetAlert
         html: `
             <label style="display:block; text-align:left; font-weight:bold; margin-bottom:8px; font-size:14px;">Masukkan Password Baru</label>
-            <input type="password" id="swal-in-pass" class="swal2-input" placeholder="Minimal 6 karakter" style="width: 100%; margin: 0; box-sizing: border-box;">
+            <div style="position: relative; width: 100%;">
+                <input type="password" id="swal-in-pass" class="swal2-input" placeholder="Minimal 6 karakter" style="width: 100%; margin: 0; box-sizing: border-box; padding-right: 65px;">
+                <span id="swal-toggle-icon" onclick="toggleSwalPass()" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 0.85rem; font-weight: bold; color: #3b82f6; user-select: none;">[Lihat]</span>
+            </div>
         `,
         showCancelButton: true,
         confirmButtonText: 'Simpan',
@@ -990,5 +1010,67 @@ async function ubahPasswordPribadi() {
             console.error("Gagal ubah password:", error);
             ui.errorGeneral("Gagal mengubah password: " + error.message);
         }
+    }
+}
+// ==========================================
+// MESIN PENCEGAT & PEMBUKA FILE (UX OVERLAY)
+// ==========================================
+function prosesBukaFile(url, isDownload) {
+    Swal.fire({
+        title: isDownload ? 'Menyiapkan Unduhan...' : 'Membuka File...',
+        text: 'Mohon tunggu sebentar.',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+    });
+
+    // Tahan layar selama 1 detik agar pengguna sadar tombol sudah tertekan
+    setTimeout(() => {
+        Swal.close();
+        if (isDownload) {
+            // Teknik injeksi link untuk memaksa unduhan tanpa membuka tab baru
+            const a = document.createElement('a');
+            a.href = url + '?download=';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        } else {
+            // Buka di tab baru untuk siswa
+            window.open(url, '_blank');
+        }
+    }, 1000);
+}
+
+// ==========================================
+// MESIN TOGGLE PASSWORD KUSTOM (TEKS SOLID)
+// ==========================================
+function togglePass() {
+    const input = document.getElementById('pass-in');
+    const icon = document.getElementById('toggle-icon');
+    if (!input || !icon) return;
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.innerText = '[Tutup]';
+        icon.style.color = '#ef4444'; // Berubah merah saat terekspos
+    } else {
+        input.type = 'password';
+        icon.innerText = '[Lihat]';
+        icon.style.color = 'var(--p)'; // Kembali ke warna tema
+    }
+}
+
+function toggleSwalPass() {
+    const input = document.getElementById('swal-in-pass');
+    const icon = document.getElementById('swal-toggle-icon');
+    if (!input || !icon) return;
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.innerText = '[Tutup]';
+        icon.style.color = '#ef4444';
+    } else {
+        input.type = 'password';
+        icon.innerText = '[Lihat]';
+        icon.style.color = '#3b82f6';
     }
 }
